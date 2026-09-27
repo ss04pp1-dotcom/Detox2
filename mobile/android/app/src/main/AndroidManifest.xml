@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ================================================================= -->
+    <!-- Permissions — every one is justified (TRD §48, UI/UX §12).        -->
+    <!-- The set is deliberately minimal; PACKAGE_USAGE_STATS and the       -->
+    <!-- accessibility binding are declared, not requested at runtime.      -->
+    <!-- ================================================================= -->
+
+    <!-- v2.5 r9.1: declared explicitly (Worker API + rewarded ads). It was
+         previously only merged in from the Ads SDK manifest. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- v2.0 Phase B2: reels hard-lockout finishes by killing the
+         offending app's background process (normal permission). -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.SYSTEM_ALERT_WINDOW"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Query the launcher-visible app list (avoids QUERY_ALL_PACKAGES per
+         Play policy). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- v2.5 r9.1: HOME apps + input methods must be visible so the
+             PolicyEngine can allow the device's own launcher and keyboards
+             dynamically (package-visibility filtering, Android 11+). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
+    </queries>
+
+    <!-- v2.5.5 audit fix C-1: predictive-back opt-in made every empty
+         onBackPressed() override dead on Android 13+ — the back gesture
+         dismissed the alarm puzzle, cage wall, monk surface and reels
+         cooldown. Legacy back dispatch (onBackPressed) must stay
+         authoritative for all enforcement surfaces (TRD §26). -->
+    <application
+        android:name=".MldApp"
+        android:label="@string/app_name"
+        android:enableOnBackInvokedCallback="false"
+        android:hasFragileUserData="true"
+        android:supportsRtl="true"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.Mld">
+
+        <!-- Flutter v2 embedding (required by the Flutter gradle plugin). -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
+        <!-- Google Mobile Ads (rewarded -> coins). The App ID is injected
+             from the MLD_ADMOB_APP_ID gradle property (see app/build.gradle);
+             the value below is Google's PUBLIC SAMPLE id and serves test
+             inventory only — set the real App ID before a Play release. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="${admobAppId}" />
+
+        <!-- ================================================================= -->
+        <!-- Flutter engine                                                    -->
+        <!-- ================================================================= -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Mld">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ================================================================= -->
+        <!-- ENFORCEMENT                                                       -->
+        <!-- ================================================================= -->
+
+        <!-- The accessibility service is the enforcement backbone: detects
+             restricted apps, shorts UI, settings navigation (TRD §12). -->
+        <service
+            android:name=".accessibility.DetoxAccessibilityService"
+            android:exported="false"
+            android:label="@string/accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Foreground service holding the enforcement context + persistent
+             notification (TRD §47). specialUse on API 34+, dataSync below. -->
+        <service
+            android:name=".enforcement.EnforcementService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|dataSync">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="digital-wellbeing-enforcement" />
+        </service>
+
+        <!-- ================================================================= -->
+        <!-- DUAL-ENGINE ENFORCEMENT (v2.0 Phase A)                            -->
+        <!-- ================================================================= -->
+
+        <!-- Engine 2: UsageStats foreground monitor — takes over when the
+             accessibility engine is blacked out by an OEM kill or loses
+             permission mid-session. -->
+        <service
+            android:name=".monitor.ForegroundAppMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="digital-wellbeing-fallback-enforcement" />
+        </service>
+
+        <!-- Persisted watchdog: 15-min JobScheduler guard that detects
+             blackouts, starts engine 2 and escalates to the user. -->
+        <service
+            android:name=".guard.AccessibilityGuardJobService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <!-- v2.3 r7: notification interception during enforcement (Monk
+             Mode / Detox sessions) — a third blocking surface fully
+             independent of both engines. User must grant Notification
+             Access explicitly; binding enforced by the platform. -->
+        <service
+            android:name=".guard.NotificationBlockerService"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true"
+            android:label="@string/notification_blocker_label">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Lock-my-phone: DeviceAdmin-backed scheduled full-device lock
+             (force-lock policy ONLY — see res/xml/device_admin.xml). -->
+        <service
+            android:name=".lock.LockMyPhoneService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="scheduled-device-lock-enforcement" />
+        </service>
+
+        <receiver
+            android:name=".lock.MldDeviceAdminReceiver"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:description="@string/device_admin_explanation"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Blocking screen: appears over restricted apps; also renders Cage
+             and Shorts warnings. Survives lock screens. -->
+        <activity
+            android:name=".enforcement.LockScreenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Mld.Lock" />
+
+        <!-- Shockwave alarm: full-screen puzzle, works even if Flutter died
+             (TRD §26). -->
+        <activity
+            android:name=".alarm.AlarmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Mld.Lock" />
+
+        <!-- Boot + package-replaced recovery (TRD §35/§137). -->
+        <!-- v2.5.5 audit fix m-17: QUICKBOOT_POWERON removed — it is a non-
+             protected broadcast any app can spoof, bootstrapping the
+             recovery path (and its foreground-service re-arms) on demand.
+             BOOT_COMPLETED + MY_PACKAGE_REPLACED are protected and cover
+             real reboots and updates; quick-boot OEMs still emit
+             BOOT_COMPLETED-equivalent recovery via MY_PACKAGE_REPLACED on
+             the next app update, and the sticky services re-arm from
+             MldApp.onCreate on any legit process start. -->
+        <receiver
+            android:name=".recovery.BootRecoveryReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- v2.5 r9.3: scheduled / recurring Lock My Phone windows. The
+             alarm is internal; TIME_SET / TIMEZONE_CHANGED re-evaluate every
+             window after a clock or zone change. -->
+        <receiver
+            android:name=".lock.LockScheduleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ============================================================= -->
+        <!-- v2.0 PHASE B                                                     -->
+        <!-- ============================================================= -->
+
+        <!-- Monk mode: allowlist-only device lockdown (FGS + DeviceAdmin
+             lockNow + guard job; wall-clock session survives reboot). -->
+        <service
+            android:name=".monk.MonkModeLockService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="device-lockdown-monk-mode" />
+        </service>
+
+        <!-- Persisted monk watchdog (resurrects the lock service after
+             OEM kills / task removal). -->
+        <service
+            android:name=".monk.MonkModeGuardJobService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <!-- Monk lock surface: full-screen, no-dismiss, finishes itself
+             at expiry or when an allowed app / call takes over. -->
+        <activity
+            android:name=".monk.MonkModeOverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Mld.Lock" />
+
+        <!-- Reels escalation surfaces: soft overlay (allowance unlocks)
+             and hard 10-second cooldown. -->
+        <activity
+            android:name=".reels.ReelsOverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Mld.Lock" />
+
+        <!-- Safety pause: the calm full-screen countdown (friction, not
+             blockade — releases itself). -->
+        <activity
+            android:name=".safety.SafetyPauseActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Mld.Lock" />
+
+        <!-- Session end / cage end / temp unlock expiry / permission sweep. -->
+        <receiver
+            android:name=".recovery.EnforcementReceiver"
+            android:exported="false" />
+
+        <!-- Alarm fire receiver. -->
+        <receiver
+            android:name=".alarm.AlarmReceiver"
+            android:exported="false" />
+
+        <!-- ============================================================= -->
+        <!-- v2.2 PHASE D — growth surfaces                                 -->
+        <!-- ============================================================= -->
+
+        <!-- Daily insight alarm (reschedules itself; fires even after
+             process death). -->
+        <receiver
+            android:name=".growth.InsightAlarmReceiver"
+            android:exported="false" />
+
+        <!-- Home-screen widgets: read native state only, tap opens the
+             app, zero enforcement authority. -->
+        <receiver
+            android:name=".widgets.StreakWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_streak_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_streak_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.SessionWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_session_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_session_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.UsageWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_usage_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_usage_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.CoinsWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_coins_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_coins_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.BrainRotWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_brainrot_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_brainrot_info" />
+        </receiver>
+        <!-- v2.5.8 roadmap: Distraction Trend widget (interactive — the
+             series-toggle broadcast is an EXPLICIT intent to this
+             component, so no extra intent-filter entry is needed). -->
+        <receiver
+            android:name=".widgets.TrendWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_trend_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_trend_info" />
+        </receiver>
+
+    </application>
+</manifest>

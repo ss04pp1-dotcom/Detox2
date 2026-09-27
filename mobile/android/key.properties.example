@@ -1,0 +1,17 @@
+# Release signing template (v2.5.7 / audit C-1).
+#
+# Copy to android/key.properties (git-ignored) and fill in the values from
+# your SECRET store. NEVER commit the real file — the previous keystore
+# committed to this repository is considered LEAKED and must be rotated
+# (see docs/RELEASE-CHECKLIST.md §1) before any Play Store release.
+#
+# Generate a fresh upload keystore:
+#   keytool -genkey -v -keystore mld-release.keystore \
+#     -alias mldrelease -keyalg RSA -keysize 4096 -validity 10000
+#
+# In CI, inject these via repository secrets instead of files.
+
+storeFile=../path/to/your/release.keystore
+storePassword=CHANGE_ME_STORE_PASSWORD
+keyAlias=mldrelease
+keyPassword=CHANGE_ME_KEY_PASSWORD

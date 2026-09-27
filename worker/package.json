@@ -1,0 +1,29 @@
+{
+  "name": "mld-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MAXLEVEL DETOX — Cloudflare Worker + D1 backend API (frozen contract v1)",
+  "main": "src/index.ts",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "wrangler dev --env development",
+    "deploy": "wrangler deploy --env production",
+    "deploy-staging": "wrangler deploy --env staging",
+    "deploy-dev": "wrangler deploy --env development",
+    "db-migrate-local": "wrangler d1 migrations apply DB --local",
+    "db-migrate-dev": "wrangler d1 migrations apply DB --env development",
+    "db-migrate-staging": "wrangler d1 migrations apply DB --env staging",
+    "db-migrate-production": "wrangler d1 migrations apply DB --env production",
+    "types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250110.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2",
+    "wrangler": "^3.114.0"
+  }
+}

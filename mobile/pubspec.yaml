@@ -1,0 +1,59 @@
+name: maxlevel_detox
+description: "MAXLEVEL DETOX — security-first Android discipline platform. Local-first enforcement, cloud-assisted product management."
+publish_to: "none"
+version: 2.5.9+23
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Design
+  # v2.5.5 audit fix: 6.x shipped a `const Map<FontWeight, …>` lookup table
+  # that fails constant evaluation on Dart 3.9+ (FontWeight == is not a
+  # primitive operator), so the app could not compile on Flutter 3.44 at
+  # all. 7.1.0 makes the table `final` and keeps the GoogleFonts.inter /
+  # .jetBrainsMono surface this app uses unchanged.
+  google_fonts: ^7.1.0
+
+  # Platform services
+  shared_preferences: ^2.3.2
+
+  # v2.5.7 audit fix (K-2): auth tokens moved from plaintext SharedPreferences
+  # to Keystore-encrypted storage. ADB backups / rooted devices could read the
+  # 30-day refresh token straight out of the XML prefs file. One-time
+  # migration from the old prefs key runs on first launch (api_client.dart).
+  flutter_secure_storage: ^9.2.2
+
+  # Sign-in (v2.5.5 audit fix: Google Sign-In had a Worker endpoint but NO
+  # client-side entry point — sign-in, purchase verification and community
+  # were all unreachable). The idToken flows to the Worker, never trusted
+  # client-side.
+  google_sign_in: ^7.1.0
+
+  # Networking (Worker API client + offline event queue)
+  http: ^1.2.2
+
+  # Ads (rewarded -> coins). Reward callbacks are the ONLY coin source.
+  google_mobile_ads: ^5.2.0
+
+  # Formatting
+  intl: ^0.19.0
+
+  # Pin the Android path provider to the pre-JNI line. path_provider_android
+  # 2.3.x migrated to package:jni, whose Android build compiles native code
+  # with CMake and requires a ~2.2 GB NDK install. The classic platform
+  # channel implementation (2.2.x) is functionally identical for our use
+  # (transitive temp-dir lookups by google_mobile_ads) and keeps the build
+  # NDK-free.
+  path_provider_android: 2.2.17
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

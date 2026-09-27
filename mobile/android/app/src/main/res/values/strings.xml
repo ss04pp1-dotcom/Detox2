@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MAXLEVEL DETOX</string>
+    <string name="accessibility_label">MAXLEVEL DETOX Enforcement</string>
+    <string name="accessibility_description">Detects restricted apps and short-form content to enforce your active Study/Detox rules. Screen content is processed on your device for enforcement only — it is never stored or uploaded.</string>
+
+    <!-- Enforcement service notification -->
+    <string name="channel_enforcement">Enforcement</string>
+    <string name="channel_enforcement_desc">Active session status</string>
+    <string name="channel_recovery">Recovery</string>
+    <string name="channel_recovery_desc">Permission and session recovery prompts</string>
+    <string name="channel_alarm">Shockwave Alarm</string>
+    <string name="channel_alarm_desc">Full-screen alarm with puzzle</string>
+
+    <string name="notif_session_active">%1$s active · %2$s remaining</string>
+    <string name="notif_cage_active">Cage active · %1$s remaining</string>
+    <string name="notif_session_paused">Study break · resumes in %1$s</string>
+    <string name="notif_session_completed">Session completed. Great work.</string>
+    <string name="notif_permission_lost">Focus protection interrupted — restore the required permission to continue your session.</string>
+
+    <!-- v2.0 Phase A: dual-engine + guards + lock-my-phone -->
+    <string name="channel_engine2">Backup protection</string>
+    <string name="channel_engine2_desc">Backup enforcement engine status</string>
+    <string name="notif_engine2_active">Backup protection active — tap to check permissions</string>
+    <string name="channel_guard">Protection alerts</string>
+    <string name="channel_guard_desc">Warnings when protection is weakened</string>
+    <string name="guard_blackout_title">Protection degraded</string>
+    <string name="guard_blackout_body">Your phone silently stopped MAXLEVEL DETOX. Backup protection is running — tap to restore full protection.</string>
+    <string name="guard_permission_title">Action needed</string>
+    <string name="guard_permission_body">A required permission was turned off during your session. Restore it to keep your commitment.</string>
+    <string name="channel_lockphone">Lock my phone</string>
+    <string name="channel_lockphone_desc">Scheduled phone lock status</string>
+    <string name="notif_lockphone_active">Phone locked · %1$02d:%2$02d remaining</string>
+    <string name="device_admin_explanation">MAXLEVEL DETOX uses device admin only to lock the screen for the scheduled lock-my-phone mode you set up. It cannot wipe or reset anything, and you can remove it any time outside a session.</string>
+
+    <!-- v2.0 Phase B: reels ladder / monk / safety pause / prime commit -->
+    <string name="channel_reels">Reels protection</string>
+    <string name="channel_reels_desc">Short-form content escalation status</string>
+    <string name="notif_reels_lockout_done_title">Lockout finished</string>
+    <string name="notif_reels_lockout_done_body">Your 10-second cooldown is over and the app was closed. Your focus is being restored.</string>
+    <string name="channel_monk">Monk mode</string>
+    <string name="channel_monk_desc">Device lockdown status</string>
+    <string name="notif_monk_active">Monk mode active · device locked to your allowlist</string>
+    <string name="notif_monk_goal_blank">Only your allowlisted apps are reachable.</string>
+    <string name="channel_prime">Prime commit</string>
+    <string name="channel_prime_desc">Commitment mode status</string>
+    <string name="notif_prime_started_title">Prime commit started</string>
+    <string name="notif_prime_started_body">%1$s — committed for the next %2$d hour(s). Unlocks and bailouts are off; only your emergency authenticator can end it early.</string>
+    <string name="notif_prime_done_title">Prime commit complete</string>
+    <string name="notif_prime_done_body">%1$s — you kept the full commitment. That is who you are now.</string>
+    <string name="notif_prime_giveup_title">Prime commit ended early</string>
+    <string name="notif_prime_giveup_body">%1$s was ended with an emergency code. The relapse is recorded in your history — without judgment, with data.</string>
+
+    <!-- v2.1 Phase C: progress layer (gamification) -->
+    <string name="channel_progress">Progress</string>
+    <string name="channel_progress_desc">Levels, streaks and milestones</string>
+    <string name="notif_levelup_title">Level up</string>
+    <string name="notif_levelup_body">You reached %1$s with %2$d lifetime Discipline Points. Keep climbing.</string>
+    <string name="notif_milestone_title">Streak milestone</string>
+    <string name="notif_milestone_body">%1$d clean days in a row — +%2$d DP. Consistency is the whole game.</string>
+    <string name="notif_freeze_title">Streak freeze used</string>
+    <string name="notif_freeze_body">A missed day was covered automatically. %1$d freeze(s) left this month.</string>
+    <string name="notif_streak_reset_title">Streak reset</string>
+    <string name="notif_streak_reset_body">%1$s Every day is day one of something better — check in today to start again.</string>
+    <string name="notif_grace_title">Recovery grace started</string>
+    <string name="notif_grace_body">Progression is paused for %1$d hours. Restore the lost permission and your streak stays intact.</string>
+    <string name="notif_relapse_title">Relapse recorded</string>
+    <string name="notif_relapse_body">A %1$d-day streak ended (%2$s). The data is yours; tomorrow is too.</string>
+
+    <!-- v2.2 Phase D: widgets / insights / break passes -->
+    <string name="widget_streak_title">MAXLEVEL Streak</string>
+    <string name="widget_session_title">MAXLEVEL Session</string>
+    <string name="widget_usage_title">MAXLEVEL Today</string>
+    <string name="widget_coins_title">MAXLEVEL Coins</string>
+    <string name="widget_streak_days">%1$d-day streak</string>
+    <string name="widget_frozen">frozen</string>
+    <string name="widget_progress_off">Progress layer is off</string>
+    <string name="widget_session_study">Study</string>
+    <string name="widget_session_detox">Detox</string>
+    <string name="widget_session_active">In enforcement — stays on until the end time</string>
+    <string name="widget_minutes_left">%1$d min left</string>
+    <string name="widget_usage_focus">%1$d min focus today</string>
+    <string name="widget_usage_blocked">%1$d distractions blocked</string>
+    <string name="widget_coins_bailout">Bailout costs %1$d</string>
+    <string name="widget_brainrot_title">Brain Rot Stage</string>
+    <string name="widget_brainrot_sub">%1$d distracting min · next stage at %2$d</string>
+    <string name="widget_brainrot_max">%1$d distracting min · final stage</string>
+
+    <!-- v2.5.8 roadmap: Distraction Trend widget -->
+    <string name="widget_trend_title">Distraction Trend</string>
+    <string name="widget_trend_mode_distraction">Screen-time</string>
+    <string name="widget_trend_mode_reels">Reels skipped</string>
+    <string name="widget_trend_chart_desc">Weekly distraction trend chart — tap to switch between screen-time and reels skipped</string>
+    <string name="widget_trend_caption_distraction">%1$d distracting minutes this week · tap to see reels</string>
+    <string name="widget_trend_caption_reels">%1$d reels skipped this week · tap to see screen-time</string>
+    <string name="notif_insight_title">Today at a glance</string>
+    <string name="notif_insight_body">%1$d minutes of focus, %2$d distractions blocked, streak at %3$d days.</string>
+    <string name="notif_announcement_offer_prefix">Offer: %1$s</string>
+    <string name="notification_blocker_label">Notification Guard</string>
+</resources>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MAXLEVEL DETOX accessibility service configuration (TRD §49).
+
+  Deliberately narrow:
+   - Only window-state + window-content events (we do not need view clicks
+     or scrolls for enforcement).
+   - canRequestFilterKeyEvents (v2.5 r9.1) is REQUIRED for the service's
+     onKeyEvent() to be called at all: FLAG_REQUEST_FILTER_KEY_EVENTS set
+     from code is silently dropped by the system without this capability,
+     which left the r9 BACK-key consumption while the wall is up dead.
+   - canRetrieveWindowContent is required for Shorts detection; node text is
+     processed IN MEMORY and never persisted or uploaded (TRD §115).
+   - notificationTimeout throttles event delivery at the system level.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagRequestFilterKeyEvents"
+    android:canRequestFilterKeyEvents="true"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_description"
+    android:notificationTimeout="200" />

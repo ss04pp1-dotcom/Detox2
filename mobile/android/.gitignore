@@ -1,0 +1,9 @@
+# Signing material + machine-local config — never commit or share these.
+key.properties
+*.keystore
+*.jks
+local.properties
+.gradle/
+.kotlin/
+build/
+app/build/

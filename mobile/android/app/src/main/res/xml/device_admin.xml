@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Device admin policies declared by MAXLEVEL DETOX (v2.0 Phase A4).
+     Deliberately minimal: force-lock ONLY. No password policies, no wipe,
+     no encryption — the lock-my-phone feature needs exactly one capability:
+     locking the screen on demand (DevicePolicyManager.lockNow()).
+     Deactivation from Settings is the user's right outside sessions; during
+     an enforcing LockMyPhone session the uninstall/interceptor path guards
+     the settings screens like any other restricted surface. -->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>

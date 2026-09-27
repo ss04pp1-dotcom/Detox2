@@ -1,0 +1,139 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "kotlin-kapt"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+// Release signing — loads credentials from android/key.properties and the
+// keystore from android/app/mld-release.keystore (relative storeFile entries
+// are resolved against the app module first, then the android root).
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+def resolveKeystoreFile = { ->
+    def storeFilePath = keystoreProperties["storeFile"]
+    if (storeFilePath == null) return null
+    def f = file(storeFilePath)          // relative to android/app
+    if (!f.exists()) {
+        f = rootProject.file(storeFilePath)  // relative to android/
+    }
+    return f.exists() ? f : null
+}
+
+android {
+    namespace = "com.maxleveldetox"
+    // v2.5.6 audit-fix build: bumped 35 → 36 — the resolved Flutter plugin
+    // set (google_sign_in_android 7.x, path_provider_android,
+    // shared_preferences_android, webview_flutter_android on Flutter 3.44.9)
+    // compiles against SDK 36. compileSdk is backward compatible; targetSdk
+    // stays 35 (runtime behavior unchanged).
+    compileSdk = 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    defaultConfig {
+        // v2.2.1 identity: applicationId deliberately differs from the
+        // namespace. The installed identity "com.maxleveldet0x" was created
+        // by the r3 test build (byte-surgery past the v1.0.7 debug-signature
+        // conflict); keeping it lets every future release upgrade IN PLACE
+        // over r3 — no uninstall, data preserved. Kotlin classes and R stay
+        // under the com.maxleveldetox namespace (component names in the
+        // compiled manifest are already fully-qualified against it).
+        applicationId = "com.maxleveldet0x"
+        minSdk = 26          // Android 8.0 — covers ~98% of active devices
+        targetSdk = 35
+        versionCode = 23
+        // 2.5.9 = 2.5.6 (audit fixes) + r10 fixes + r11 roadmap (leaderboard,
+        // clubs, dynamic detection rules, trend widget) + r11.1 opportunity
+        // cost nudges — see docs/R9-R11.1-CHANGES.md.
+        versionName = "2.5.9"
+        ndk {
+            // r7-era distribution target: single-ABI arm64 release (no
+            // split-per-abi versionCode offsets — keeps versionCode pure).
+            // Filters the tiny foreign-ABI .so that transitive AARs
+            // (androidx.datastore) ship; libflutter/libapp are arm64-only
+            // via --target-platform android-arm64.
+            abiFilters "arm64-v8a"
+        }
+
+        // v2.5.5 audit fix M-9: AdMob App ID must be injectable per build.
+        // Default is Google's PUBLIC SAMPLE id (test inventory only).
+        // Override with: ./gradlew assembleRelease -PMLD_ADMOB_APP_ID=ca-app-pub-XXXX~YYYY
+        // (or gradle.properties / CI env). The release checklist should fail
+        // the Play upload if this still starts with ca-app-pub-3940256099942544.
+        manifestPlaceholders += [
+            admobAppId: (project.findProperty('MLD_ADMOB_APP_ID') ?: 'ca-app-pub-3940256099942544~3347511713')
+        ]
+    }
+
+    signingConfigs {
+        release {
+            def ksFile = resolveKeystoreFile()
+            if (ksFile != null && keystoreProperties["storePassword"] != null) {
+                storeFile ksFile
+                storePassword keystoreProperties["storePassword"]
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // Release hardening (TRD §140): shrink + obfuscate + no debug logs.
+            // Signed with the project release keystore when key.properties is
+            // present; falls back to debug signing for CI-less environments.
+            if (keystoreProperties["storePassword"] != null) {
+                signingConfig = signingConfigs.release
+            } else {
+                signingConfig = signingConfigs.debug
+            }
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+        debug {
+            applicationIdSuffix = ".debug"
+        }
+    }
+
+    // No native code ships from this project. Google's Flutter engine
+    // artifact for this revision ships libflutter.so UNSTRIPPED (163 MB);
+    // AGP's strip task (llvm-strip from the NDK) reduces it to ~10 MB in the
+    // packaged APK. The NDK presence here is for STRIPPING ONLY — there is
+    // no C/C++ compilation in this app (the Flutter Gradle plugin's
+    // forceNdkDownload cmake stub is disabled in this build environment's
+    // SDK copy; see the delivery notes).
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
+
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "com.google.android.material:material:1.12.0"
+    implementation "androidx.lifecycle:lifecycle-service:2.8.7"
+
+    // v2.2 Phase D — Google Play Billing (purchase LAUNCHER only;
+    // entitlements are granted by the Worker after Play Developer API
+    // verification, never by this client).
+    implementation "com.android.billingclient:billing-ktx:7.1.1"
+
+    // Persistent state (TRD §36/§57). Room 2.7.x — its annotation
+    // processor reads the Kotlin 2.1 metadata shipped by Flutter 3.44-era
+    // plugin AARs (Room 2.6.1 caps at Kotlin 2.0 metadata and kapt fails).
+    implementation "androidx.datastore:datastore-preferences:1.1.1"
+    implementation "androidx.room:room-runtime:2.7.2"
+    implementation "androidx.room:room-ktx:2.7.2"
+    kapt "androidx.room:room-compiler:2.7.2"
+}

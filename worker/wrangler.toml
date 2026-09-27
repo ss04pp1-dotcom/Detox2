@@ -1,0 +1,106 @@
+# MAXLEVEL DETOX — API Worker configuration
+# 3 environments: development (mld-api-dev), staging (mld-api-staging), production (mld-api).
+# Top-level config doubles as the production defaults; each [env.*] block redeclares its
+# bindings explicitly (bindings do not reliably inherit into environments).
+
+name = "mld-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+workers_dev = true
+migrations_dir = "src/db/migrations"
+
+[observability]
+enabled = true
+
+# M6: every 30 minutes the `scheduled` handler in src/index.ts flips
+# subscriptions whose expiry_date has passed to status = 'EXPIRED', keeping
+# entitlements and admin premium metrics honest server-side.
+[triggers]
+crons = ["*/30 * * * *"]
+
+# ---------------------------------------------------------------- production --
+[vars]
+API_ENV = "production"
+ADMIN_ORIGIN = "https://admin.maxleveldetox.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mld-db-production"
+database_id = "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID"
+
+# Custom domain for the production API — uncomment once the zone is in this
+# Cloudflare account and DNS is configured (see README "Custom domain"):
+# routes = [
+#   { pattern = "api.maxleveldetox.com/*", zone_name = "maxleveldetox.com" }
+# ]
+
+# --------------------------------------------------------------- development --
+[env.development]
+name = "mld-api-dev"
+workers_dev = true
+
+[env.development.vars]
+API_ENV = "development"
+ADMIN_ORIGIN = "https://admin.maxleveldetox.com,http://localhost:5173"
+
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "mld-db-dev"
+database_id = "REPLACE_WITH_DEV_D1_DATABASE_ID"
+
+[[env.development.kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_DEV_KV_NAMESPACE_ID"
+
+# ------------------------------------------------------------------- staging --
+[env.staging]
+name = "mld-api-staging"
+workers_dev = true
+
+[env.staging.vars]
+API_ENV = "staging"
+ADMIN_ORIGIN = "https://admin-staging.maxleveldetox.com"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "mld-db-staging"
+database_id = "REPLACE_WITH_STAGING_D1_DATABASE_ID"
+
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_STAGING_KV_NAMESPACE_ID"
+
+# Uncomment for the staging custom domain:
+# routes = [
+#   { pattern = "api-staging.maxleveldetox.com/*", zone_name = "maxleveldetox.com" }
+# ]
+
+# ----------------------------------------------------------------- production --
+# Explicit mirror of the top-level block so `wrangler deploy --env production`
+# is self-contained. Secrets (never committed here) per environment:
+#   wrangler secrets put GOOGLE_CLIENT_SECRET   --env production
+#   wrangler secrets put ADMIN_SESSION_SECRET   --env production
+[env.production]
+name = "mld-api"
+workers_dev = true
+
+[env.production.vars]
+API_ENV = "production"
+ADMIN_ORIGIN = "https://admin.maxleveldetox.com"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "mld-db-production"
+database_id = "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID"
+
+# routes = [
+#   { pattern = "api.maxleveldetox.com/*", zone_name = "maxleveldetox.com" }
+# ]

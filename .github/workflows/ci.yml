@@ -1,0 +1,74 @@
+# MAXLEVEL DETOX — CI (v2.5.7 / audit L-6).
+#
+# Gates on every PR + push to main:
+#   worker : tsc --noEmit + vitest unit suite
+#   admin  : tsc --noEmit + vite production build
+#   mobile : flutter analyze (lint gate; the Android unit-test story is
+#            intentionally deferred — see docs/RELEASE-CHECKLIST.md)
+#
+# Release automation (Play upload, wrangler deploy) is deliberately NOT
+# wired here yet: it needs signing secrets that, per audit C-1, must first
+# be created fresh in GitHub Secrets and the keystore rotated. The workflow
+# file below is the regression gate; add a `release.yml` once the secrets
+# exist.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker:
+    name: Worker — types + tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+      - run: npm run types
+      - run: npm test
+
+  admin:
+    name: Admin — typecheck + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+  mobile:
+    name: Mobile — flutter analyze
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-pub
