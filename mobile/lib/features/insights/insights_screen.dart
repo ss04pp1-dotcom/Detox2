@@ -443,7 +443,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
     if (widget.embedded) return body;
     return Scaffold(
-      appBar: AppBar(title: const Text('Insights')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Insights')),
       body: SafeArea(child: body),
     );
   }
@@ -499,7 +499,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('History')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'History')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

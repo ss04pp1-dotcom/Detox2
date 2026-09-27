@@ -130,7 +130,7 @@ export default function Layout(): JSX.Element {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 flex flex-col border-r border-edge bg-surface transition-[width] duration-200',
+          'fixed inset-y-0 left-0 z-30 flex flex-col border-r border-edge/80 bg-surface/90 shadow-2xl shadow-black/30 backdrop-blur-xl transition-[width] duration-200',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
@@ -161,10 +161,10 @@ export default function Layout(): JSX.Element {
                       title={collapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         cn(
-                          'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
+                          'flex items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2.5 text-sm font-medium transition-all duration-200',
                           isActive
-                            ? 'bg-accent/15 text-accent'
-                            : 'text-ink2 hover:bg-elevated hover:text-ink',
+                            ? 'border-accent/20 bg-accent/[0.12] text-accent shadow-[0_8px_24px_-16px_rgba(110,168,255,.8)]'
+                            : 'text-ink2 hover:border-edge hover:bg-elevated/80 hover:text-ink',
                         )
                       }
                     >
@@ -234,7 +234,7 @@ export default function Layout(): JSX.Element {
         </header>
 
         {/* Content */}
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="mld-page-glow flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-7xl">
             <Outlet />
           </div>

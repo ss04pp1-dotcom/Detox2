@@ -47,7 +47,7 @@ class _PermissionCenterScreenState extends State<PermissionCenterScreen> {
     final perms = AppStateScope.of(context).state.permissions;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Permission Center')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Permission Center')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH.copyWith(

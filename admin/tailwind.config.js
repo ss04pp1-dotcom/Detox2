@@ -6,13 +6,13 @@ export default {
     extend: {
       colors: {
         // Dark control-center palette (admin only — distinct from mobile app)
-        page: '#0B1120', // page background
-        surface: '#111A2E', // cards / panels
-        elevated: '#1A2440', // elevated surfaces, inputs hover
-        edge: '#1E293B', // borders
-        ink: '#E2E8F0', // primary text
+        page: '#060B16', // page background
+        surface: '#0E1728', // cards / panels
+        elevated: '#17233B', // elevated surfaces, inputs hover
+        edge: '#243653', // borders
+        ink: '#F1F5F9', // primary text
         ink2: '#94A3B8', // secondary text
-        accent: '#6366F1', // indigo accent
+        accent: '#6EA8FF', // indigo accent
         ok: '#10B981', // success
         warn: '#F59E0B', // warning
         bad: '#EF4444', // danger
@@ -23,7 +23,7 @@ export default {
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(99, 102, 241, 0.25), 0 4px 24px -6px rgba(99, 102, 241, 0.35)',
+        glow: '0 0 0 1px rgba(110, 168, 255, 0.24), 0 12px 36px -12px rgba(54, 150, 255, 0.38)',
       },
     },
   },

@@ -341,7 +341,7 @@ class _StudySetupScreenState extends State<StudySetupScreen> {
 
     if (widget.embedded) return body;
     return Scaffold(
-      appBar: AppBar(title: const Text('Study Mode')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Study Mode')),
       body: SafeArea(child: body),
     );
   }
@@ -558,7 +558,7 @@ class _DetoxSetupScreenState extends State<DetoxSetupScreen> {
 
     if (widget.embedded) return body;
     return Scaffold(
-      appBar: AppBar(title: const Text('Detox Mode')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Detox Mode')),
       body: SafeArea(child: body),
     );
   }

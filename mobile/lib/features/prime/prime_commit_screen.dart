@@ -154,7 +154,7 @@ class _PrimeCommitScreenState extends State<PrimeCommitScreen> {
     final remaining = ((_status?['remainingSeconds'] as num?) ?? 0).toInt();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Prime Commit')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Prime Commit')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),

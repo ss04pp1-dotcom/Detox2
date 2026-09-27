@@ -37,7 +37,7 @@ class _CoinHistoryScreenState extends State<CoinHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Coin History')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Coin History')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

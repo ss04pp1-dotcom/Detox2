@@ -73,7 +73,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     if (snap == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Progress')),
+        appBar: AppBar(title: const MLDAppBarTitle(title: 'Progress')),
         body: Center(
           child: _error == null
               ? const CircularProgressIndicator(color: AppColors.primary)
@@ -88,7 +88,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     if (!snap.enabled) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Progress')),
+        appBar: AppBar(title: const MLDAppBarTitle(title: 'Progress')),
         body: const Center(
           child: MLDEmptyState(
             icon: Icons.terrain_outlined,
@@ -101,7 +101,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Progress')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Progress')),
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: _load,

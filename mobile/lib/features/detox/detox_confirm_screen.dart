@@ -21,7 +21,7 @@ class DetoxConfirmScreen extends StatelessWidget {
         : '${args.durationMinutes} min';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ready to Commit?')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Ready to Commit?')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),

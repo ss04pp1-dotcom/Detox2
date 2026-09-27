@@ -50,25 +50,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _tab, children: pages),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.background, Color(0xFF0B1020)]),
+        ),
+        child: IndexedStack(index: _tab, children: pages),
+      ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
-          backgroundColor: AppColors.surface,
-          indicatorColor: AppColors.primary.withValues(alpha: 0.15),
-          labelTextStyle: WidgetStatePropertyAll(
-            AppTypography.caption().copyWith(fontSize: 11, fontWeight: FontWeight.w600),
-          ),
+          backgroundColor: const Color(0xEE0D1324),
+          indicatorColor: AppColors.primary.withValues(alpha: .16),
+          elevation: 0,
+          height: 74,
+          labelTextStyle: WidgetStatePropertyAll(AppTypography.caption().copyWith(fontSize: 10, fontWeight: FontWeight.w700)),
+          iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(color: states.contains(WidgetState.selected) ? AppColors.primary : AppColors.textSecondary, size: 23)),
         ),
         child: NavigationBar(
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
-          height: 68,
           destinations: const [
-            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-            NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Insights'),
-            NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: 'Community'),
-            NavigationDestination(icon: Icon(Icons.checklist_outlined), selectedIcon: Icon(Icons.checklist), label: 'Tasks'),
-            NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
+            NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights_rounded), label: 'Insights'),
+            NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups_rounded), label: 'Community'),
+            NavigationDestination(icon: Icon(Icons.checklist_outlined), selectedIcon: Icon(Icons.checklist_rounded), label: 'Tasks'),
+            NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings_rounded), label: 'Settings'),
           ],
         ),
       ),
@@ -170,6 +175,8 @@ class _HomePageState extends State<_HomePage> with WidgetsBindingObserver {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: AppSpacing.screenH.copyWith(top: AppSpacing.xl, bottom: AppSpacing.xxxl),
           children: [
+            const MLDBrandHeader(),
+            const SizedBox(height: AppSpacing.xl),
             const _Greeting(),
             // v2.7 r13 — emergency dialer-only lockdown state banner
             // (renders nothing while inactive).

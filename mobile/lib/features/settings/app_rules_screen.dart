@@ -100,7 +100,7 @@ class _AppRulesScreenState extends State<AppRulesScreen> {
     final categories = byCategory.keys.toList()..sort();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('App Rules')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'App Rules')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

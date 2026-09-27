@@ -132,7 +132,7 @@ class _TasksScreenState extends State<TasksScreen> {
     final combo = _status?['comboEarnedToday'] as bool? ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Tasks')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Tasks')),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

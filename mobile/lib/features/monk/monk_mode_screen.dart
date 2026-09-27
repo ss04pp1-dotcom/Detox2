@@ -117,7 +117,7 @@ class _MonkModeScreenState extends State<MonkModeScreen> {
     final active = _status?['active'] as bool? ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Monk Mode')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Monk Mode')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

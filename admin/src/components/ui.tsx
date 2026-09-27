@@ -56,8 +56,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'border border-transparent bg-accent text-white shadow-sm shadow-accent/25 hover:bg-indigo-500',
-  secondary: 'border border-edge bg-elevated text-ink hover:border-slate-600 hover:bg-[#20304f]',
+  primary: 'border border-transparent bg-gradient-to-r from-accent to-[#4D7DFF] text-white shadow-lg shadow-accent/20 hover:brightness-110',
+  secondary: 'border border-edge bg-gradient-to-b from-elevated to-surface text-ink shadow-sm hover:border-accent/30 hover:bg-elevated',
   danger: 'border border-bad/40 bg-bad/10 text-bad hover:bg-bad/20',
   ghost: 'border border-transparent bg-transparent text-ink2 hover:bg-elevated hover:text-ink',
 };
@@ -77,7 +77,7 @@ export function Button({
       type={type ?? 'button'}
       disabled={disabled === true || loading}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50',
         size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-4 py-2 text-sm',
         BUTTON_VARIANTS[variant],
         className,
@@ -106,7 +106,7 @@ interface CardProps {
 export function Card({ children, className, title, description, actions, padded = true }: CardProps): JSX.Element {
   const hasHeader = title !== undefined || description !== undefined || actions !== undefined;
   return (
-    <section className={cn('overflow-hidden rounded-xl border border-edge bg-surface', className)}>
+    <section className={cn('mld-glass overflow-hidden rounded-2xl border border-edge/80', className)}>
       {hasHeader ? (
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-edge px-5 py-4">
           <div className="min-w-0">
@@ -156,7 +156,7 @@ export function StatCard({
   loading = false,
 }: StatCardProps): JSX.Element {
   return (
-    <div className="rounded-xl border border-edge bg-surface p-4">
+    <div className="mld-glass rounded-2xl border border-edge/80 p-4 shadow-glow">
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-ink2">{label}</p>
         {icon !== undefined ? <span className={cn('shrink-0 rounded-lg p-2', STAT_ACCENTS[accent])}>{icon}</span> : null}

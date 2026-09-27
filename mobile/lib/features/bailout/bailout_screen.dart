@@ -111,7 +111,7 @@ class _BailoutScreenState extends State<BailoutScreen> {
     _appState ??= app;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('End Session Early?')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'End Session Early?')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),

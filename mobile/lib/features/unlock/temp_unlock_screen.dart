@@ -72,7 +72,7 @@ class _TempUnlockScreenState extends State<TempUnlockScreen> {
     final activeRemaining = app.state.tempUnlock?.remainingSeconds ?? 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Temporary Unlock')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Temporary Unlock')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),

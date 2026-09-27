@@ -6,6 +6,180 @@ import 'package:flutter/services.dart';
 import '../core/theme/tokens.dart';
 import '../data/native_bridge.dart';
 
+/// MLDAppBackdrop — shared visual atmosphere for every route.
+/// It is intentionally decoration-only: no state, navigation, or interaction.
+class MLDAppBackdrop extends StatelessWidget {
+  const MLDAppBackdrop({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF020A16), AppColors.background, Color(0xFF06182A)],
+          stops: [0, .48, 1],
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const IgnorePointer(child: CustomPaint(painter: _MLDGridPainter())),
+          Positioned(
+            top: -170,
+            right: -110,
+            child: IgnorePointer(
+              child: Container(
+                width: 380,
+                height: 380,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withValues(alpha: .035),
+                  boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: .16), blurRadius: 150, spreadRadius: 18)],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -170,
+            left: -120,
+            child: IgnorePointer(
+              child: Container(
+                width: 390,
+                height: 390,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.premium.withValues(alpha: .03),
+                  boxShadow: [BoxShadow(color: AppColors.premium.withValues(alpha: .12), blurRadius: 150, spreadRadius: 15)],
+                ),
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+
+class _MLDGridPainter extends CustomPainter {
+  const _MLDGridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = AppColors.primary.withValues(alpha: .018)..strokeWidth = 1;
+    const step = 28.0;
+    for (double x = 0; x <= size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
+    }
+    for (double y = 0; y <= size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+    }
+    final glow = Paint()..color = AppColors.primary.withValues(alpha: .018);
+    for (double x = 14; x < size.width; x += step * 2) {
+      for (double y = 14; y < size.height; y += step * 2) {
+        canvas.drawCircle(Offset(x, y), 1.2, glow);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MLDGridPainter oldDelegate) => false;
+}
+
+/// Compact brand header used by the reference dashboard and key surfaces.
+/// The mark is vector-painted in Flutter so no mock image/data is embedded.
+class MLDAppBarTitle extends StatelessWidget {
+  const MLDAppBarTitle({super.key, required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CustomPaint(size: Size(30, 24), painter: _MLDLogoPainter()),
+        const SizedBox(width: 9),
+        Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
+      ],
+    );
+  }
+}
+
+class MLDBrandHeader extends StatelessWidget {
+  const MLDBrandHeader({super.key, this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        CustomPaint(
+          size: Size(compact ? 34 : 42, compact ? 28 : 34),
+          painter: const _MLDLogoPainter(),
+        ),
+        SizedBox(width: compact ? 8 : 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'MAXLEVEL DETOX',
+              style: AppTypography.body(weight: FontWeight.w900)
+                  .copyWith(fontSize: compact ? 13 : 15, letterSpacing: -.2),
+            ),
+            if (!compact)
+              Text('Better You, Higher Level', style: AppTypography.caption().copyWith(fontSize: 10)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MLDLogoPainter extends CustomPainter {
+  const _MLDLogoPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * .13
+      ..strokeCap = StrokeCap.square
+      ..strokeJoin = StrokeJoin.miter;
+    final left = AppColors.primary.withValues(alpha: .85);
+    const right = AppColors.textPrimary;
+    const accent = AppColors.primary;
+
+    final a = Path()
+      ..moveTo(size.width * .05, size.height * .88)
+      ..lineTo(size.width * .34, size.height * .18)
+      ..lineTo(size.width * .52, size.height * .62);
+    p.color = left;
+    canvas.drawPath(a, p);
+
+    final b = Path()
+      ..moveTo(size.width * .42, size.height * .88)
+      ..lineTo(size.width * .66, size.height * .28)
+      ..lineTo(size.width * .95, size.height * .88);
+    p.color = right;
+    canvas.drawPath(b, p);
+
+    final glow = Paint()
+      ..color = accent.withValues(alpha: .16)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7);
+    canvas.drawCircle(Offset(size.width * .66, size.height * .28), size.width * .09, glow);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MLDLogoPainter oldDelegate) => false;
+}
+
 /// MLDButton — primary CTA (UI/UX §56). Minimum 54dp, loading state never
 /// implies success while native validation is pending (UI/UX §80).
 enum MLDButtonVariant { primary, secondary, danger }
@@ -33,13 +207,8 @@ class MLDButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onPressed == null || loading;
-
-    final (bg, fg, border) = switch (variant) {
-      MLDButtonVariant.primary => (AppColors.primary, AppColors.onPrimary, null),
-      MLDButtonVariant.secondary => (Colors.transparent, AppColors.textPrimary, AppColors.edge),
-      MLDButtonVariant.danger => (AppColors.danger, Colors.white, null),
-    };
-
+    final accent = variant == MLDButtonVariant.danger ? AppColors.danger : AppColors.primary;
+    final fg = variant == MLDButtonVariant.secondary ? AppColors.textPrimary : Colors.white;
     return Semantics(
       button: true,
       enabled: !disabled,
@@ -48,39 +217,31 @@ class MLDButton extends StatelessWidget {
         child: SizedBox(
           width: expanded ? double.infinity : null,
           height: height ?? AppSizes.ctaHeight,
-          child: Material(
-            color: disabled ? AppColors.elevated : bg,
-            borderRadius: BorderRadius.circular(AppRadii.button),
-            child: InkWell(
-              onTap: disabled ? null : (onPressed!),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: variant == MLDButtonVariant.secondary
+                  ? LinearGradient(colors: [AppColors.surface.withValues(alpha: .92), AppColors.elevated.withValues(alpha: .72)])
+                  : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent, accent.withValues(alpha: .68)]),
+              color: null,
               borderRadius: BorderRadius.circular(AppRadii.button),
-              child: Container(
-                decoration: border != null
-                    ? BoxDecoration(border: Border.all(color: border, width: 1.4)) // v2.5.5 audit fix: no-effect `!` removed (flow-promoted non-null)
-                    : null,
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (loading)
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    else if (icon != null) ...[
-                      Icon(icon, size: 20, color: fg),
-                      const SizedBox(width: 8),
-                    ],
+              border: Border.all(color: variant == MLDButtonVariant.secondary ? AppColors.edge : accent.withValues(alpha: .82)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: .25), blurRadius: 16, offset: const Offset(0, 8)),
+                if (variant != MLDButtonVariant.secondary) BoxShadow(color: accent.withValues(alpha: .20), blurRadius: 22, offset: const Offset(0, 5)),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: disabled ? null : onPressed,
+                borderRadius: BorderRadius.circular(AppRadii.button),
+                child: Center(
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (loading) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    else if (icon != null) ...[Icon(icon, size: 19, color: fg), const SizedBox(width: 8)],
                     if (loading) const SizedBox(width: 10),
-                    Text(
-                      label,
-                      style: AppTypography.body(
-                        color: disabled ? AppColors.textSecondary : fg,
-                        weight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                    Text(label, style: AppTypography.body(color: fg, weight: FontWeight.w800)),
+                  ]),
                 ),
               ),
             ),
@@ -218,11 +379,21 @@ class MLDCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: color,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: .98),
+            AppColors.elevated.withValues(alpha: .68),
+            AppColors.background.withValues(alpha: .56),
+          ],
+          stops: const [0, .48, 1],
+        ),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: borderColor),
-        boxShadow: const [
-          BoxShadow(color: Color(0x33000000), blurRadius: 18, offset: Offset(0, 6)),
+        border: Border.all(color: borderColor.withValues(alpha: .72)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: .38), blurRadius: 24, offset: const Offset(0, 12)),
+          BoxShadow(color: AppColors.primary.withValues(alpha: .055), blurRadius: 28, spreadRadius: -8),
         ],
       ),
       child: child,
@@ -243,7 +414,17 @@ class MLDSectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         children: [
-          Expanded(child: Text(title, style: AppTypography.label())),
+          Container(
+            width: 3,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(99),
+              boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: .45), blurRadius: 8)],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(title, style: AppTypography.label(color: AppColors.textSecondary))),
           if (action != null) action!,
         ],
       ),
@@ -266,25 +447,32 @@ class MLDStatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = accent ?? AppColors.primary;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.elevated,
-        borderRadius: BorderRadius.circular(AppRadii.sm),
-        border: Border.all(color: AppColors.edge),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [c.withValues(alpha: .12), AppColors.surface, AppColors.elevated.withValues(alpha: .7)],
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: c.withValues(alpha: .26)),
+        boxShadow: [BoxShadow(color: c.withValues(alpha: .06), blurRadius: 18, spreadRadius: -4)],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(value,
-              style: AppTypography.heading(
-                color: accent ?? AppColors.textPrimary,
-              ).copyWith(fontSize: 22)),
-          const SizedBox(height: 2),
-          Text(label, style: AppTypography.caption()),
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Row(
+          children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle, boxShadow: [BoxShadow(color: c.withValues(alpha: .65), blurRadius: 9)])),
+            const Spacer(),
+            Icon(Icons.chevron_right_rounded, color: c.withValues(alpha: .65), size: 17),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(value, style: AppTypography.heading(color: AppColors.textPrimary, weight: FontWeight.w800).copyWith(fontSize: 22)),
+        const SizedBox(height: 3),
+        Text(label, style: AppTypography.caption()),
+      ]),
     );
   }
 }
@@ -460,7 +648,7 @@ class MLDPermissionTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        gradient: LinearGradient(colors: [AppColors.surface, AppColors.elevated.withValues(alpha: .58)]),
         borderRadius: BorderRadius.circular(AppRadii.sm),
         border: Border.all(color: granted ? AppColors.edge : color.withValues(alpha: 0.5)),
       ),
@@ -519,7 +707,7 @@ class MLDAppRuleTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        gradient: LinearGradient(colors: [AppColors.surface, AppColors.elevated.withValues(alpha: .58)]),
         borderRadius: BorderRadius.circular(AppRadii.sm),
         border: Border.all(color: AppColors.edge),
       ),
@@ -716,29 +904,30 @@ class MLDModeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      child: MLDCard(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-                border: Border.all(color: accent.withValues(alpha: 0.3)),
-              ),
-              child: Icon(icon, color: accent, size: 22),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(title, style: AppTypography.body(weight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(subtitle, style: AppTypography.caption()),
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withValues(alpha: .14), AppColors.surface, AppColors.background.withValues(alpha: .45)]),
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            border: Border.all(color: accent.withValues(alpha: .24)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Container(width: 48, height: 48, decoration: BoxDecoration(color: accent.withValues(alpha: .14), shape: BoxShape.circle, border: Border.all(color: accent.withValues(alpha: .32))), child: Icon(icon, color: accent, size: 23)),
+                Icon(Icons.arrow_forward_rounded, color: accent.withValues(alpha: .75), size: 19),
+              ]),
+              const Spacer(),
+              Text(title, style: AppTypography.body(weight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              Text(subtitle, style: AppTypography.caption()),
+            ]),
+          ),
         ),
       ),
     );

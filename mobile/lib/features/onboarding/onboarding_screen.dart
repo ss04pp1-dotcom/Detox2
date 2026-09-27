@@ -20,36 +20,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _page = 0;
 
   static const _pages = [
-    (
-      title: 'TAKE BACK\nCONTROL',
-      body: 'Your phone should work for you,\nnot against you.',
-      icon: Icons.shield_outlined,
-      accent: AppColors.primary,
-    ),
-    (
-      title: 'BUILD YOUR\nFOCUS',
-      body: 'Study when you need to.\nDisconnect when you choose to.',
-      icon: Icons.school_outlined,
-      accent: AppColors.info,
-    ),
-    (
-      title: 'MAKE THE\nCOMMITMENT',
-      body: 'Once a session starts,\nyour rules become active.',
-      icon: Icons.lock_outline,
-      accent: AppColors.warning,
-    ),
-    (
-      title: 'ENFORCEMENT',
-      body: "MAXLEVEL DETOX uses Android's\nsupported controls to keep your\nrules active.",
-      icon: Icons.security_outlined,
-      accent: AppColors.primary,
-    ),
-    (
-      title: "YOU'RE STILL\nSAFE",
-      body: "Emergency communication remains\navailable according to Android's\nsystem rules.",
-      icon: Icons.emergency_outlined,
-      accent: AppColors.success,
-    ),
+    (title: 'TAKE BACK\nCONTROL', body: 'Your phone should work for you,\nnot against you.', image: 'assets/ui/onboarding_control.png', accent: AppColors.primary),
+    (title: 'BUILD YOUR\nFOCUS', body: 'Study when you need to.\nDisconnect when you choose to.', image: 'assets/ui/onboarding_focus.png', accent: AppColors.safety),
+    (title: 'MAKE THE\nCOMMITMENT', body: 'Once a session starts,\nyour rules become active.', image: 'assets/ui/onboarding_pact.png', accent: AppColors.monk),
+    (title: 'PROTECT YOUR\nATTENTION', body: "MAXLEVEL DETOX uses Android's\nsupported controls to keep your rules active.", image: 'assets/ui/onboarding_permission.png', accent: AppColors.success),
+    (title: 'CHOOSE YOUR\nLEVEL', body: 'Start small, build consistency,\nand level up your discipline.', image: 'assets/ui/onboarding_modes.png', accent: AppColors.premium),
   ];
 
   void _next() {
@@ -69,28 +44,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = _pages[_page];
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.background, p.accent.withValues(alpha: .07), AppColors.background]),
+        ),
+        child: SafeArea(
+          child: Column(children: [
             Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (_page > 0)
-                    TextButton(
-                      onPressed: () => _controller.previousPage(
-                          duration: AppDurations.slow, curve: Curves.easeOutCubic),
-                      child: const Text('Back'),
-                    )
-                  else
-                    const SizedBox(width: 60),
-                  MLDWarningDots(count: _page + 1, limit: _pages.length, size: 8),
-                  Text('${_page + 1} / ${_pages.length}',
-                      style: AppTypography.caption()),
-                ],
-              ),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.lg, AppSpacing.xl, 0),
+              child: Row(children: [
+                if (_page > 0) IconButton(onPressed: () => _controller.previousPage(duration: AppDurations.slow, curve: Curves.easeOutCubic), icon: const Icon(Icons.arrow_back_rounded)) else const SizedBox(width: 48),
+                const Spacer(),
+                Text('MAXLEVEL', style: AppTypography.label(color: p.accent)),
+                const Spacer(),
+                Text('${_page + 1}/${_pages.length}', style: AppTypography.caption()),
+              ]),
             ),
             Expanded(
               child: PageView.builder(
@@ -102,38 +72,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   final page = _pages[i];
                   return Padding(
                     padding: AppSpacing.screenH,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          height: 160,
-                          decoration: BoxDecoration(
-                            color: page.accent.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(AppRadii.hero),
-                            border: Border.all(color: page.accent.withValues(alpha: 0.3)),
-                          ),
-                          child: Icon(page.icon, size: 72, color: page.accent),
-                        ),
-                        const SizedBox(height: AppSpacing.massive),
-                        Text(page.title,
-                            textAlign: TextAlign.center,
-                            style: AppTypography.display()),
-                        const SizedBox(height: AppSpacing.xxl),
-                        Text(page.body,
-                            textAlign: TextAlign.center,
-                            style: AppTypography.body(color: AppColors.textSecondary, weight: FontWeight.w500)),
-                      ],
-                    ),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Container(
+                        constraints: const BoxConstraints(maxWidth: 390),
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppRadii.hero), boxShadow: [BoxShadow(color: page.accent.withValues(alpha: .12), blurRadius: 40)]),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.asset(page.image, fit: BoxFit.cover),
+                      ),
+                      const SizedBox(height: AppSpacing.xxl),
+                      Text(page.title, textAlign: TextAlign.center, style: AppTypography.display().copyWith(fontSize: 32)),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(page.body, textAlign: TextAlign.center, style: AppTypography.body(color: AppColors.textSecondary, weight: FontWeight.w500)),
+                    ]),
                   );
                 },
               ),
             ),
             Padding(
               padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),
-              child: MLDButton(label: 'Continue', onPressed: _next),
+              child: Column(children: [
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(_pages.length, (i) => AnimatedContainer(duration: AppDurations.normal, margin: const EdgeInsets.symmetric(horizontal: 4), width: i == _page ? 26 : 7, height: 7, decoration: BoxDecoration(color: i == _page ? p.accent : AppColors.edge, borderRadius: BorderRadius.circular(99))))),
+                const SizedBox(height: AppSpacing.xl),
+                MLDButton(label: _page == _pages.length - 1 ? 'MEET YOUR SYSTEM' : 'CONTINUE', icon: _page == _pages.length - 1 ? Icons.arrow_forward_rounded : Icons.chevron_right_rounded, onPressed: _next),
+              ]),
             ),
-          ],
+          ]),
         ),
       ),
     );
@@ -190,7 +153,7 @@ class _PactScreenState extends State<PactScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('The Commitment Pact')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'The Commitment Pact')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),

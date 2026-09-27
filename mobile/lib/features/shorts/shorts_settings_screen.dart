@@ -22,7 +22,7 @@ class _ShortsSettingsScreenState extends State<ShortsSettingsScreen> {
     final shorts = app.state.shorts;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Shorts Blocker')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Shorts Blocker')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),

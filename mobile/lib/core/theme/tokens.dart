@@ -8,26 +8,26 @@ import 'package:google_fonts/google_fonts.dart';
 /// consistent: dark, serious, premium, high-contrast during enforcement.
 abstract final class AppColors {
   // Surfaces
-  static const Color background = Color(0xFF0A0E1A);
-  static const Color surface = Color(0xFF111A2E);
-  static const Color elevated = Color(0xFF1E293B);
-  static const Color edge = Color(0xFF243049);
+  static const Color background = Color(0xFF04101F);
+  static const Color surface = Color(0xFF071A31);
+  static const Color elevated = Color(0xFF0C2745);
+  static const Color edge = Color(0xFF174E79);
 
   // Brand
-  static const Color primary = Color(0xFF6366F1); // indigo 500
-  static const Color primaryDim = Color(0xFF4F46E5); // indigo 600
-  static const Color premium = Color(0xFF8B5CF6); // violet
+  static const Color primary = Color(0xFF22A7FF); // reference blue
+  static const Color primaryDim = Color(0xFF1475C8); // reference blue dim
+  static const Color premium = Color(0xFF8B4DFF); // reference violet
 
   // Semantics (UI/UX §4 — color is never the only signal)
-  static const Color success = Color(0xFF10B981);
+  static const Color success = Color(0xFF19D7B0);
   static const Color warning = Color(0xFFF59E0B);
   static const Color danger = Color(0xFFEF4444);
-  static const Color info = Color(0xFF3B82F6);
+  static const Color info = Color(0xFF27B9FF);
 
   // Text
-  static const Color textPrimary = Color(0xFFF1F5F9);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textDisabled = Color(0xFF64748B);
+  static const Color textPrimary = Color(0xFFF5FAFF);
+  static const Color textSecondary = Color(0xFFA6BCD2);
+  static const Color textDisabled = Color(0xFF66819B);
 
   // Cage / enforcement lock — deepest red-toned surface
   static const Color cageBackground = Color(0xFF140B0B);
@@ -95,13 +95,13 @@ abstract final class AppDurations {
 /// Typography — Inter with tabular numerals for timers (UI/UX §5).
 abstract final class AppTypography {
   static TextStyle display({Color color = AppColors.textPrimary, FontWeight weight = FontWeight.w800}) =>
-      GoogleFonts.inter(fontSize: 36, height: 1.1, fontWeight: weight, color: color, letterSpacing: -0.5);
+      GoogleFonts.inter(fontSize: 34, height: 1.1, fontWeight: weight, color: color, letterSpacing: -0.5);
 
   static TextStyle heading({Color color = AppColors.textPrimary, FontWeight weight = FontWeight.w700}) =>
-      GoogleFonts.inter(fontSize: 26, height: 1.15, fontWeight: weight, color: color, letterSpacing: -0.3);
+      GoogleFonts.inter(fontSize: 24, height: 1.15, fontWeight: weight, color: color, letterSpacing: -0.3);
 
   static TextStyle section({Color color = AppColors.textPrimary, FontWeight weight = FontWeight.w700}) =>
-      GoogleFonts.inter(fontSize: 19, height: 1.2, fontWeight: weight, color: color);
+      GoogleFonts.inter(fontSize: 17, height: 1.2, fontWeight: weight, color: color);
 
   static TextStyle body(
           {Color color = AppColors.textPrimary, FontWeight weight = FontWeight.w400, double? height, double? fontSize}) =>

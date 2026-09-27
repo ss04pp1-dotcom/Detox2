@@ -91,7 +91,7 @@ class _SafetyPauseScreenState extends State<SafetyPauseScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Safety Pause')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Safety Pause')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

@@ -11,6 +11,11 @@
 
   body {
     @apply bg-page font-sans text-ink antialiased;
+    background:
+      radial-gradient(circle at 86% 4%, rgba(76, 137, 255, 0.12), transparent 26rem),
+      radial-gradient(circle at 8% 92%, rgba(153, 92, 255, 0.07), transparent 24rem),
+      linear-gradient(135deg, #060b16 0%, #081223 52%, #07101e 100%);
+    background-attachment: fixed;
   }
 
   ::selection {
@@ -54,5 +59,25 @@
 @layer components {
   .mono {
     @apply font-mono text-[11px];
+  }
+}
+
+
+@layer components {
+  .mld-page-glow {
+    position: relative;
+  }
+  .mld-page-glow::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 70% 0%, rgba(75, 146, 255, .06), transparent 28rem);
+    z-index: -1;
+  }
+  .mld-glass {
+    background: linear-gradient(145deg, rgba(17, 30, 51, .94), rgba(9, 18, 33, .88));
+    box-shadow: 0 18px 45px -24px rgba(0,0,0,.75), 0 0 0 1px rgba(110,168,255,.05);
+    backdrop-filter: blur(14px);
   }
 }

@@ -206,7 +206,7 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Shockwave Alarm')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Shockwave Alarm')),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,

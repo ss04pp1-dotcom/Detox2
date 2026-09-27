@@ -192,7 +192,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (widget.embedded) return body;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Settings')),
       body: SafeArea(child: body),
     );
   }

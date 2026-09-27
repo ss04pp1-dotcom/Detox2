@@ -286,7 +286,7 @@ class _AccountScreenState extends State<AccountScreen> {
     final trialDays = _trialDaysLeft;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Account')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

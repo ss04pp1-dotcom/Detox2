@@ -82,7 +82,7 @@ class _EmergencyCodesScreenState extends State<EmergencyCodesScreen> {
     final used = _status?['usedCount'] as int? ?? 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Emergency Codes')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Emergency Codes')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

@@ -99,7 +99,7 @@ class _LockMyPhoneScreenState extends State<LockMyPhoneScreen> {
     final attempts = ((_status?['attempts'] as num?) ?? 0).toInt();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Lock My Phone')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Lock My Phone')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),

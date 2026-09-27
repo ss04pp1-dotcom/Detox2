@@ -13,6 +13,7 @@ import 'data/api_client.dart';
 import 'data/app_state.dart';
 import 'data/models.dart';
 import 'data/native_bridge.dart';
+import 'shared/mld_widgets.dart';
 
 /// MAXLEVEL DETOX — entry point.
 ///
@@ -452,6 +453,7 @@ class _MldAppState extends State<MldApp> {
         title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
         theme: buildMldTheme(),
+        builder: (context, child) => MLDAppBackdrop(child: child ?? const SizedBox.shrink()),
         initialRoute: AppConstants.routeSplash,
         routes: buildAppRoutes(),
       ),

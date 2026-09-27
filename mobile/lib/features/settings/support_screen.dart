@@ -106,7 +106,7 @@ class _SupportScreenState extends State<SupportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Report a Problem')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Report a Problem')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: AppSpacing.screenH,

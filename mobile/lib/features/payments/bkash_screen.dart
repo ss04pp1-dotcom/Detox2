@@ -168,7 +168,7 @@ class _BkashScreenState extends State<BkashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('bKash Payment')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'bKash Payment')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

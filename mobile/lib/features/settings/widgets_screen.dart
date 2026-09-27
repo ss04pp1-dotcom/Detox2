@@ -66,7 +66,7 @@ class _WidgetsScreenState extends State<WidgetsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Home-screen widgets')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Home-screen widgets')),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

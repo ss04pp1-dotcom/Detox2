@@ -83,7 +83,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Blocking Schedules')),
+      appBar: AppBar(title: const MLDAppBarTitle(title: 'Blocking Schedules')),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
