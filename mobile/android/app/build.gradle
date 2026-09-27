@@ -52,15 +52,15 @@ android {
         applicationId = "com.maxleveldet0x"
         minSdk = 26          // Android 8.0 — covers ~98% of active devices
         targetSdk = 35
-        versionCode = 25
-        // 2.6.0 = 2.5.10 (r11.2 audit) + the reference-design release: mode
-        // accent palette (Study teal / Detox fuchsia / Monk amber / Lock
-        // red / Safety cyan / Prime violet), glowing gradient timer rings,
-        // 5-tab shell (Home, Insights, Community, Tasks, Settings), Quick
-        // Actions grid, session Pause/End/Details + details sheet, Lock
-        // ring timer, Prime TOTP chip, completion stat cards — see
-        // docs/R12-CHANGES.md.
-        versionName = "2.6.0"
+        versionCode = 26
+        // 2.7.0 (r13) — user-reported fixes: reels/shorts now redirect
+        // IN-APP to the platform's safe surface (YouTube Home / FB Feed /
+        // IG Feed) instead of kicking out; emergency = dialer-ONLY
+        // lockdown (nothing else reachable, ends from the app banner, 15-min
+        // safety cap); Insights APP USAGE TODAY card (per-app minutes);
+        // API timeout 12s->6s + local-midnight usage window — see
+        // docs/R13-CHANGES.md.
+        versionName = "2.7.0"
         ndk {
             // r7-era distribution target: single-ABI arm64 release (no
             // split-per-abi versionCode offsets — keeps versionCode pure).
@@ -140,4 +140,15 @@ dependencies {
     implementation "androidx.room:room-runtime:2.7.2"
     implementation "androidx.room:room-ktx:2.7.2"
     kapt "androidx.room:room-compiler:2.7.2"
+}
+
+// v2.7 r13 build note: native debug-symbol packaging (Play Console crash
+// symbolication) is DISABLED — the merged zip includes the UNSTRIPPED
+// Flutter engine .so (100s of MB) and is only consumed by Play uploads.
+// Direct-distribution APKs ship fine without it. Re-enable (remove this
+// block) before a Play Store upload.
+afterEvaluate {
+    tasks.matching { it.name == "mergeReleaseNativeDebugMetadata" }.configureEach {
+        enabled = false
+    }
 }

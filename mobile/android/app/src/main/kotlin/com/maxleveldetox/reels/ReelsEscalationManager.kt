@@ -263,7 +263,14 @@ class ReelsEscalationManager(
             )
             playLockoutFinishedRingtone()
             postLockoutFinishedNotification()
-            forceStopPackage(pkg)
+            // v2.7 r13 (user-requested): even the hard lockout stays inside
+            // the offending app — navigate to its safe surface (YouTube
+            // Home / FB Feed / IG Feed) instead of killing it. Force-stop
+            // remains the fallback for platforms with no safe surface
+            // (TikTok / browser shorts tabs).
+            if (!com.maxleveldetox.reels.ReelsRedirect.navigateFromContext(context, pkg)) {
+                forceStopPackage(pkg)
+            }
         }
     }
 

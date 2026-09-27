@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/tokens.dart';
+import '../data/native_bridge.dart';
 
 /// MLDButton — primary CTA (UI/UX §56). Minimum 54dp, loading state never
 /// implies success while native validation is pending (UI/UX §80).
@@ -789,6 +792,110 @@ class MLDBarChart extends StatelessWidget {
             ),
           );
         }),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
+// v2.7 r13 — Emergency lockdown banner (user-requested semantics).
+//
+// Emergency = the phone is a DIALER AND NOTHING ELSE: enforcement stays
+// fully armed, every other app bounces straight back to the dialer. This
+// banner is how the user deliberately ENDS the emergency from our app
+// (the only non-dialer app reachable during the lockdown). It polls the
+// native lockdown state every 3s and renders nothing when inactive.
+// ---------------------------------------------------------------------
+class MLDEmergencyBanner extends StatefulWidget {
+  const MLDEmergencyBanner({super.key});
+
+  @override
+  State<MLDEmergencyBanner> createState() => _MLDEmergencyBannerState();
+}
+
+class _MLDEmergencyBannerState extends State<MLDEmergencyBanner> {
+  bool _active = false;
+  int _remaining = 0;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _poll = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final s = await NativeBridge.instance.getEmergencyLockdown();
+      if (!mounted) return;
+      final active = s['active'] == true;
+      final remaining = ((s['remainingSeconds'] as num?) ?? 0).toInt();
+      if (active != _active || _remaining != remaining) {
+        setState(() {
+          _active = active;
+          _remaining = remaining;
+        });
+      }
+    } catch (_) {
+      // bridge hiccup — the next poll retries
+    }
+  }
+
+  Future<void> _end() async {
+    try {
+      await NativeBridge.instance.endEmergencyLockdown();
+    } catch (_) {
+    }
+    if (!mounted) return;
+    setState(() => _active = false);
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_active) return const SizedBox.shrink();
+    final mins = (_remaining ~/ 60).clamp(0, 99);
+    final secs = _remaining % 60;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.emergency, color: AppColors.danger, size: 26),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('EMERGENCY MODE ACTIVE',
+                    style: AppTypography.body(
+                        weight: FontWeight.w800, color: AppColors.danger)),
+                const SizedBox(height: 2),
+                Text(
+                  'Phone limited to the dialer only. Ends in '
+                  '${mins}m ${secs.toString().padLeft(2, '0')}s — or end it now.',
+                  style: AppTypography.caption(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          MLDButton(
+            label: 'END',
+            onPressed: _end,
+            variant: MLDButtonVariant.danger,
+          ),
+        ],
       ),
     );
   }

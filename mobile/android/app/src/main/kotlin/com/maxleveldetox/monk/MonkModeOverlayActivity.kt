@@ -97,6 +97,9 @@ class MonkModeOverlayActivity : Activity() {
         })
 
         // Emergency is ALWAYS reachable (PRD §27) — never blocked.
+        // v2.7 r13 (user-requested): emergency = DIALER-ONLY LOCKDOWN — the
+        // phone stays enforced, confined to the dialer until the user ends
+        // it from the app (or the 15-minute safety cap expires).
         root.addView(Button(this).apply {
             text = "Emergency"
             setTextColor(Color.parseColor("#EF4444"))
@@ -105,7 +108,8 @@ class MonkModeOverlayActivity : Activity() {
             isAllCaps = true
             setOnClickListener {
                 try {
-                    startActivity(Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    com.maxleveldetox.safety.EmergencyLockdown.start(this@MonkModeOverlayActivity)
+                    com.maxleveldetox.safety.EmergencyLockdown.openDialer(this@MonkModeOverlayActivity)
                 } catch (_: Exception) {
                 }
             }
@@ -118,6 +122,13 @@ class MonkModeOverlayActivity : Activity() {
         override fun run() {
             when {
                 !MonkModeManager.isActive(this@MonkModeOverlayActivity) -> {
+                    finish()
+                    return
+                }
+                // v2.7 r13: the emergency lockdown owns the screen while it
+                // lasts — the dialer must stay visible and the service tick
+                // polices the boundary (dialer + our app only).
+                com.maxleveldetox.safety.EmergencyLockdown.isActive(this@MonkModeOverlayActivity) -> {
                     finish()
                     return
                 }

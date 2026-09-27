@@ -171,6 +171,9 @@ class _HomePageState extends State<_HomePage> with WidgetsBindingObserver {
           padding: AppSpacing.screenH.copyWith(top: AppSpacing.xl, bottom: AppSpacing.xxxl),
           children: [
             const _Greeting(),
+            // v2.7 r13 — emergency dialer-only lockdown state banner
+            // (renders nothing while inactive).
+            const MLDEmergencyBanner(),
             if (_offer != null) ...[
               const SizedBox(height: AppSpacing.lg),
               _OfferBanner(

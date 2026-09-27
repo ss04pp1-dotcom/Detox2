@@ -104,6 +104,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           padding: AppSpacing.screenH.copyWith(top: AppSpacing.xl, bottom: AppSpacing.xxl),
           child: Column(
             children: [
+              // v2.7 r13 — emergency dialer-only lockdown banner (renders
+              // nothing while inactive). Lives above everything so END is
+              // always the first reachable control in our app.
+              const MLDEmergencyBanner(),
               const SizedBox(height: AppSpacing.xl),
               Container(
                 width: 72,

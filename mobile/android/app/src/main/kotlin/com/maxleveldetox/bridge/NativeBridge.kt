@@ -1268,17 +1268,27 @@ class NativeBridge(private val context: Context) : MethodChannel.MethodCallHandl
                 // -----------------------------------------------------
                 // Emergency
                 // -----------------------------------------------------
+                // v2.7 r13 (user-requested): emergency = DIALER-ONLY
+                // LOCKDOWN. The enforcement system stays fully armed — the
+                // phone is confined to the dialer (anything else bounces
+                // straight back) until the user ends emergency from the
+                // app banner, or the 15-minute safety cap expires.
                 "emergencyCall" -> {
+                    com.maxleveldetox.safety.EmergencyLockdown.start(context)
                     try {
-                        context.startActivity(
-                            android.content.Intent(android.content.Intent.ACTION_DIAL)
-                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
+                        com.maxleveldetox.safety.EmergencyLockdown.openDialer(context)
                         ok()
                     } catch (e: Exception) {
                         err(ErrorCodes.SYSTEM_RESTRICTION, "Dialer unavailable")
                     }
                 }
+                "endEmergencyLockdown" -> {
+                    com.maxleveldetox.safety.EmergencyLockdown.end(context)
+                    ok()
+                }
+                "getEmergencyLockdown" -> ok(
+                    com.maxleveldetox.safety.EmergencyLockdown.statusJson(context)
+                )
 
                 // -----------------------------------------------------
                 // Debug-only tools — IMPOSSIBLE in release builds.

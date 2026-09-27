@@ -22,6 +22,8 @@ import com.maxleveldetox.overlay.EnforcementWall
 import com.maxleveldetox.reels.ReelsDetector
 import com.maxleveldetox.reels.ReelsEscalationManager
 import com.maxleveldetox.reels.ReelsOverlayActivity
+import com.maxleveldetox.reels.ReelsRedirect
+import com.maxleveldetox.safety.EmergencyLockdown
 import com.maxleveldetox.safety.SafetyPauseActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,6 +135,36 @@ class DetoxAccessibilityService : AccessibilityService() {
         }
 
         val app = application as? MldApp ?: return
+
+        // ----------------------------------------------------------------
+        // v2.7 r13 — EMERGENCY LOCKDOWN (user-requested semantics): while
+        // the emergency surface is live the phone is a DIALER AND NOTHING
+        // ELSE. Every other app is bounced straight back to the dialer;
+        // our own app stays reachable so the user can end emergency
+        // deliberately. Runs before every other surface so nothing else
+        // can widen the lockdown.
+        // ----------------------------------------------------------------
+        if (pkg != packageName && EmergencyLockdown.isActive(this) &&
+            !EmergencyLockdown.isAllowed(this, pkg)) {
+            DiagLog.log("EMERGENCY_LOCKDOWN", "$pkg bounced to dialer")
+            EmergencyLockdown.openDialer(this)
+            try {
+                android.widget.Toast.makeText(
+                    this, "Emergency mode — dialer only.",
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            } catch (_: Exception) {
+            }
+            app.violationManager.record(
+                sessionId = "emergency",
+                pkg = pkg,
+                type = ViolationType.BLOCKED_APP,
+                severity = "LOW",
+                warningNumber = 0,
+                action = "emergency_lockdown",
+            )
+            return
+        }
 
         // ----------------------------------------------------------------
         // v2.3 r7 — ALWAYS-ON surfaces (no session required, Social
@@ -355,9 +387,12 @@ class DetoxAccessibilityService : AccessibilityService() {
 
         lastReelsSignal = now
 
-        // Push out of the feed first (TikTok strategy: instant home),
-        // then escalate through the ladder.
-        performGlobalAction(GLOBAL_ACTION_HOME)
+        // v2.7 r13 (user-requested): stay INSIDE the app — navigate to its
+        // safe surface (YouTube Home / FB Feed / IG Feed) instead of
+        // kicking the user out to the launcher. HOME is the fallback only.
+        if (!ReelsRedirect.navigateFromService(this, pkg)) {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
 
         manager.onDetection(pkg, detection.strategy) { esc ->
             when (esc.step) {
@@ -437,8 +472,12 @@ class DetoxAccessibilityService : AccessibilityService() {
 
         lastShortsSignal = now
 
-        // Push the user out of the shorts surface, then escalate.
-        performGlobalAction(GLOBAL_ACTION_HOME)
+        // v2.7 r13: in-session shorts interception now also stays inside
+        // the app (safe surface) — same redirect as the out-of-session
+        // path. HOME is the fallback only.
+        if (!ReelsRedirect.navigateFromService(this, pkg)) {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
 
         app.violationManager.shortsAttempt(
             pkg = pkg,

@@ -39,7 +39,15 @@ class UsageTracker(private val context: Context) {
             ?: return emptyList()
 
         val now = System.currentTimeMillis()
-        val dayStart = now - (now % 86_400_000L) // UTC-day approx; display use only
+        // v2.7 r13: LOCAL midnight (the old `now % 86_400_000` UTC-day
+        // approximation started the "today" window at 06:00 in Bangladesh —
+        // morning usage landed on yesterday's ranking).
+        val cal = java.util.Calendar.getInstance()
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        val dayStart = cal.timeInMillis
 
         val events = mgr.queryEvents(dayStart, now)
 

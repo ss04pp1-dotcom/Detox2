@@ -615,7 +615,11 @@ class ApiClient {
       if (authenticated) request.headers['Authorization'] = 'Bearer $_accessToken';
       if (body != null) request.body = jsonEncode(body);
 
-      final response = await request.send().timeout(const Duration(seconds: 12));
+      // v2.7 r13: 12s -> 6s. The production Worker is not deployed yet, so
+      // every cloud call currently fails against NXDOMAIN — a 12-second
+      // spinner per tab was the "stuck loading screen" users reported.
+      // Six seconds is still generous for a slow-but-live backend.
+      final response = await request.send().timeout(const Duration(seconds: 6));
       final text = await response.stream.bytesToString();
       if (text.isEmpty) return null;
       final Map<String, dynamic> envelope;

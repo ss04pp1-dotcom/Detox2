@@ -211,7 +211,10 @@ class _CommitsTabState extends State<_CommitsTab> {
                       children: const [
                         SizedBox(height: 120),
                         Center(
-                          child: Text('No active commitments yet.\nBe the first to go public.',
+                          child: Text(
+                              'No active commitments yet.\n'
+                              'Be the first to go public — or you may be '
+                              'offline.\nPull to retry.',
                               textAlign: TextAlign.center,
                               style: TextStyle(color: AppColors.textSecondary)),
                         ),

@@ -162,6 +162,12 @@ class MonkModeLockService : Service() {
 
     /** LOCKED: make sure the lock surface owns the screen. */
     private fun tickLocked() {
+        // v2.7 r13: the emergency lockdown owns policing while it lasts —
+        // the dialer stays visible and everything else is bounced back.
+        if (com.maxleveldetox.safety.EmergencyLockdown.isActive(this)) {
+            tickEmergency()
+            return
+        }
         // The overlay activity re-asserts itself; if the user somehow
         // escaped to a non-allowed app (e.g. notification shade launch),
         // the usage-events check below catches it as an implicit exit —
@@ -179,6 +185,12 @@ class MonkModeLockService : Service() {
 
     /** ALLOWED_APP: police the 5s UsageEvents window. */
     private fun tickAllowedApp() {
+        // v2.7 r13: emergency lockdown supersedes the normal allowlist
+        // check while it is live.
+        if (com.maxleveldetox.safety.EmergencyLockdown.isActive(this)) {
+            tickEmergency()
+            return
+        }
         val topPkg = latestResumedPackage() ?: return
         if (isAllowedWhileAllowedApp(topPkg)) return
 
@@ -186,6 +198,19 @@ class MonkModeLockService : Service() {
         MonkModeManager.setState(this, MonkModeManager.MonkState.LOCKED)
         MonkModeManager.lockNow(this)
         showLockSurface()
+    }
+
+    /**
+     * v2.7 r13 — emergency dialer-only lockdown (user-requested): the
+     * dialer family + our own app stay usable; every other app is brought
+     * straight back to the dialer. No re-lock, no overlay — the lockdown
+     * IS the surface while it lasts (15-minute safety cap).
+     */
+    private fun tickEmergency() {
+        val topPkg = latestResumedPackage() ?: return
+        if (topPkg == packageName) return
+        if (com.maxleveldetox.safety.EmergencyLockdown.isAllowed(this, topPkg)) return
+        com.maxleveldetox.safety.EmergencyLockdown.openDialer(this)
     }
 
     private fun isAllowedWhileLocked(pkg: String): Boolean =
@@ -306,6 +331,12 @@ class MonkModeLockService : Service() {
                     mode == AudioManager.MODE_NORMAL -> {
                         if (callModeActive) {
                             callModeActive = false
+                            // v2.7 r13: while the emergency lockdown is
+                            // live, IT owns the re-lock decision — the
+                            // tickEmergency path keeps the dialer usable.
+                            if (com.maxleveldetox.safety.EmergencyLockdown.isActive(this)) {
+                                return@OnModeChangedListener
+                            }
                             // Call ended: re-lock unless a genuinely allowed
                             // app is in the foreground.
                             val top = latestResumedPackage()

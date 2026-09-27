@@ -38,6 +38,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
   // v2.5.9 (r11.2) — today's top distracting apps (display-only ranking).
   List<Map<String, dynamic>> _topApps = const [];
 
+  // v2.7 (r13) — FULL per-app usage today (user-requested: "which apps did
+  // I run and for how long"). Ranked, with share-of-day bars + total
+  // screen time.
+  List<UsageStat> _usage = const [];
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +55,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
     final cost = await NativeBridge.instance.getOpportunityCost();
     final trend = await NativeBridge.instance.getDistractionTrend();
     final topApps = await NativeBridge.instance.getTopDistractingApps();
+    final usage = await NativeBridge.instance.getUsageStats();
     if (!mounted) return;
     setState(() {
       _stats = stats;
@@ -58,6 +64,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       }
       _trendDays = trend;
       _topApps = topApps;
+      _usage = usage;
       if (subRes != null && subRes['subscription'] is Map) {
         _subscription = SubscriptionInfo.fromJson(
             Map<dynamic, dynamic>.from(subRes['subscription'] as Map));
@@ -66,6 +73,13 @@ class _InsightsScreenState extends State<InsightsScreen> {
   }
 
   bool get _isPro => _subscription?.isActive ?? false;
+
+  /// v2.7 (r13) — helpers for the APP USAGE TODAY card.
+  int get _usageTotalMinutes =>
+      _usage.fold<int>(0, (sum, a) => sum + a.minutesToday);
+
+  int get _usageMaxMinutes =>
+      _usage.fold<int>(0, (m, a) => a.minutesToday > m ? a.minutesToday : m);
 
   String _fmtSeconds(int s) {
     if (s <= 0) return '0m';
@@ -223,6 +237,92 @@ class _InsightsScreenState extends State<InsightsScreen> {
             ),
             const SizedBox(height: AppSpacing.xxl),
           ],
+
+          // v2.7 (r13) — APP USAGE TODAY (user-requested): every app with
+          // real foreground minutes today — what ran, for how long, ranked
+          // with share-of-day bars and the total screen-time line.
+          MLDCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                MLDSectionHeader(title: 'APP USAGE TODAY'),
+                const SizedBox(height: AppSpacing.sm),
+                if (_usage.isEmpty)
+                  Text(
+                    'No usage recorded yet today. Grant usage access in '
+                    'Permission Center if this stays empty.',
+                    style: AppTypography.caption(),
+                  )
+                else ...[
+                  ...List.generate(_usage.take(8).length, (i) {
+                    final app = _usage[i];
+                    final minutes = app.minutesToday;
+                    final share = _usageMaxMinutes <= 0
+                        ? 0.0
+                        : (minutes / _usageMaxMinutes).clamp(0.0, 1.0);
+                    return Padding(
+                      padding: EdgeInsets.only(
+                          bottom: i == 7 || i == _usage.length - 1
+                              ? 0
+                              : AppSpacing.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: 22,
+                                child: Text('${i + 1}',
+                                    style: AppTypography.caption()),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  app.appName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.body(),
+                                ),
+                              ),
+                              Text(
+                                minutes >= 60
+                                    ? '${minutes ~/ 60}h ${minutes % 60}m'
+                                    : '${minutes}m',
+                                style: AppTypography.caption(),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: share,
+                              minHeight: 4,
+                              backgroundColor: AppColors.edge,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  if (_usage.length > 8)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.md),
+                      child: Text('…and ${_usage.length - 8} more apps',
+                          style: AppTypography.caption()),
+                    ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'Total screen time: ${_fmtSeconds(_usageTotalMinutes * 60)}',
+                    style: AppTypography.caption(
+                        color: AppColors.textSecondary),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
 
           // v2.5.9 (r11.1) — OPPORTUNITY COST (user-requested): "ei shomoy
           // kaje lagale eita hoto" — the user's own weekly numbers projected

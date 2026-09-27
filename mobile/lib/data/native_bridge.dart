@@ -475,9 +475,25 @@ class NativeBridge {
   // Emergency
   // ---------------------------------------------------------------------
 
-  /// Opens the dialer (never a restricted action — PRD §27).
+  /// v2.7 r13 (user-requested): emergency now enters a DIALER-ONLY
+  /// LOCKDOWN — the phone stays enforced, confined to the dialer, until
+  /// ended from the app banner (or the 15-minute safety cap).
   Future<void> openEmergencyDialer() async {
     await call('emergencyCall');
+  }
+
+  /// True while the emergency dialer-only lockdown is live.
+  Future<Map<String, dynamic>> getEmergencyLockdown() async {
+    final r = await call('getEmergencyLockdown');
+    if (!r.isOk) return {'active': false, 'remainingSeconds': 0};
+    final data = r.data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return {'active': false, 'remainingSeconds': 0};
+  }
+
+  /// Deliberately end the emergency lockdown (app banner button).
+  Future<void> endEmergencyLockdown() async {
+    await call('endEmergencyLockdown');
   }
 
   // ---------------------------------------------------------------------

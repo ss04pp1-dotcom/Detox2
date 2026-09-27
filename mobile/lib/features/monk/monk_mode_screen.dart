@@ -139,6 +139,10 @@ class _MonkModeScreenState extends State<MonkModeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // v2.7 r13 — emergency dialer-only lockdown banner (renders
+          // nothing while inactive).
+          const MLDEmergencyBanner(),
+          const SizedBox(height: AppSpacing.md),
           MLDCard(
             borderColor: AppColors.monk.withValues(alpha: 0.4),
             child: Column(
