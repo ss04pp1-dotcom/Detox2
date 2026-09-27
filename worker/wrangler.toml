@@ -26,11 +26,11 @@ ADMIN_ORIGIN = "https://admin.maxleveldetox.com"
 [[d1_databases]]
 binding = "DB"
 database_name = "mld-db-production"
-database_id = "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID"
+database_id = "d8230d47-2d65-4a9b-be52-10ec8d057db8"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID"
+id = "3be10dad29a44f7291d55230c23cdfb7"
 
 # Custom domain for the production API — uncomment once the zone is in this
 # Cloudflare account and DNS is configured (see README "Custom domain"):
@@ -95,11 +95,11 @@ ADMIN_ORIGIN = "https://admin.maxleveldetox.com"
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "mld-db-production"
-database_id = "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID"
+database_id = "d8230d47-2d65-4a9b-be52-10ec8d057db8"
 
 [[env.production.kv_namespaces]]
 binding = "KV"
-id = "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID"
+id = "3be10dad29a44f7291d55230c23cdfb7"
 
 # routes = [
 #   { pattern = "api.maxleveldetox.com/*", zone_name = "maxleveldetox.com" }
