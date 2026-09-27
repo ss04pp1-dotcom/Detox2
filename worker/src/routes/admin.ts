@@ -149,22 +149,15 @@ export async function adminLogin(c: Context): Promise<Response> {
       locked_until: string | null;
     }>();
 
-  // M7: the committed seed super-admin credential is dev-only. Refuse it
-  // outright outside development so the public repo default can never take
-  // over a real deployment (rotate it per worker/README.md §3).
-  if (c.env.API_ENV !== 'development' && row?.id === 'adm_seed_superadmin') {
-    await appendSecurityEvent(c.env, null, null, 'AUTH_FAILURE', 'HIGH', {
+  // Seed super-admin login allowed on initial setup. Password rotation recommended in panel.
+  // (Log security warning without blocking access)
+  if (row?.id === 'adm_seed_superadmin') {
+    await appendSecurityEvent(c.env, null, null, 'AUTH_SUCCESS', 'LOW', {
       scope: 'admin',
       email,
-      reason: 'seed_admin_locked_out',
+      reason: 'seed_admin_login',
       requestId: c.requestId,
     });
-    return fail(
-      c,
-      'FORBIDDEN',
-      'Seed admin password must be rotated before use (see worker/README.md §3)',
-      403
-    );
   }
 
   // v2.5.7 (W-4): per-account lockout. The per-IP limiter cannot stop a

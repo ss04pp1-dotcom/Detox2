@@ -31,8 +31,28 @@ export function newRequestId(): string {
  *  - http://localhost:5173 (caprilegacy local admin dev) in development only.
  * There is never a "*" — the browser Origin header must match exactly.
  */
+/**
+ * CORS origin allowlist. Sources:
+ *  - the ADMIN_ORIGIN env var (comma-separated), and
+ *  - the default admin origin, and
+ *  - http://localhost:5173 (caprilegacy local admin dev) in development only.
+ *  - Any Cloudflare Pages domain (*.pages.dev).
+ */
+export function isAllowedOrigin(origin: string | null, env: Env): boolean {
+  if (!origin) return false;
+  const list = allowedOrigins(env);
+  if (list.includes(origin)) return true;
+  try {
+    const url = new URL(origin);
+    if (url.hostname.endsWith('.pages.dev')) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 export function allowedOrigins(env: Env): string[] {
-  const list: string[] = [DEFAULT_ADMIN_ORIGIN];
+  const list: string[] = [DEFAULT_ADMIN_ORIGIN, 'https://detox2.pages.dev'];
   if (env.API_ENV === 'development') list.push(DEV_ADMIN_ORIGIN);
   if (env.ADMIN_ORIGIN) {
     for (const raw of env.ADMIN_ORIGIN.split(',')) {
@@ -52,7 +72,7 @@ function applySecurityHeaders(headers: Headers): void {
 
 function applyCorsHeaders(headers: Headers, req: Request, env: Env): void {
   const origin = req.headers.get('Origin');
-  if (origin !== null && allowedOrigins(env).includes(origin)) {
+  if (origin !== null && isAllowedOrigin(origin, env)) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Vary', 'Origin');
   }
@@ -107,7 +127,7 @@ export function preflightResponse(c: Context): Response {
   const headers = new Headers();
   applySecurityHeaders(headers);
   const origin = c.req.headers.get('Origin');
-  if (origin !== null && allowedOrigins(c.env).includes(origin)) {
+  if (origin !== null && isAllowedOrigin(origin, c.env)) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');

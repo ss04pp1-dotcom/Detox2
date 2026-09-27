@@ -20,7 +20,7 @@ crons = ["*/30 * * * *"]
 # ---------------------------------------------------------------- production --
 [vars]
 API_ENV = "production"
-ADMIN_ORIGIN = "https://admin.maxleveldetox.com"
+ADMIN_ORIGIN = "https://detox2.pages.dev,https://admin.maxleveldetox.com,http://localhost:5173"
 
 [[d1_databases]]
 binding = "DB"
@@ -90,7 +90,7 @@ workers_dev = true
 
 [env.production.vars]
 API_ENV = "production"
-ADMIN_ORIGIN = "https://admin.maxleveldetox.com"
+ADMIN_ORIGIN = "https://detox2.pages.dev,https://admin.maxleveldetox.com,http://localhost:5173"
 
 [[env.production.d1_databases]]
 binding = "DB"
