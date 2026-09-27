@@ -65,17 +65,24 @@ import type {
 
 export { ApiError, toApiError } from './error';
 
-const envApiUrl = import.meta.env.VITE_API_URL;
+function resolveBaseUrl(): string {
+  const env = import.meta.env.VITE_API_URL?.trim();
+  if (env === 'mock') return 'mock';
+  const target = env && env.length > 0 ? env : 'https://mld-api.salman61902.workers.dev/api/v1';
+  let clean = target.replace(/\/+$/, '');
+  if (!clean.endsWith('/api/v1')) {
+    clean = `${clean}/api/v1`;
+  }
+  return clean;
+}
+
+const resolvedApiUrl = resolveBaseUrl();
 
 /** True when running the fully client-side demo dataset. */
-export const IS_MOCK = envApiUrl === 'mock';
+export const IS_MOCK = resolvedApiUrl === 'mock';
 
 /** Resolved API base (informational, shown on the System page). */
-export const API_BASE_URL: string = IS_MOCK
-  ? 'mock://in-memory'
-  : envApiUrl && envApiUrl.length > 0
-    ? envApiUrl.replace(/\/+$/, '')
-    : '/api/v1 (same origin)';
+export const API_BASE_URL: string = IS_MOCK ? 'mock://in-memory' : resolvedApiUrl;
 
 // ---------------------------------------------------------------------------
 // Token store — memory first, mirrored into sessionStorage so a reload
@@ -126,7 +133,7 @@ function statusFallback(status: number): string {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   if (IS_MOCK) return mockRequest<T>(method, path, body);
 
-  const base = envApiUrl && envApiUrl.length > 0 ? envApiUrl.replace(/\/+$/, '') : '/api/v1';
+  const base = resolvedApiUrl;
   let response: Response;
   try {
     const headers: Record<string, string> = { Accept: 'application/json' };

@@ -398,18 +398,22 @@ export default {
 
     try {
       // Health probe for external monitors (no auth, no D1).
-      if (url.pathname === '/health') {
+      if (url.pathname === '/health' || url.pathname === '/api/v1/health') {
         response = new Response(
           JSON.stringify({ success: true, data: { status: 'ok', environment: env.API_ENV }, requestId }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
       } else if (request.method === 'OPTIONS') {
         response = preflightResponse(c);
-      } else if (!url.pathname.startsWith(BASE + '/')) {
-        response = fail(c, 'NOT_FOUND', 'Unknown path. API base is /api/v1/', 404);
       } else {
         const method = request.method === 'HEAD' ? 'GET' : request.method;
-        const segments = url.pathname.slice(BASE.length).split('/').filter((s) => s.length > 0);
+        const rawPath = url.pathname;
+        const routePath = rawPath.startsWith(BASE + '/')
+          ? rawPath.slice(BASE.length)
+          : rawPath === BASE
+            ? ''
+            : rawPath;
+        const segments = routePath.split('/').filter((s) => s.length > 0);
         const matched = matchRoute(method, segments);
 
         if (matched === null) {
