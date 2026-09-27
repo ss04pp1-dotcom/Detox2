@@ -36,5 +36,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: 'worker'
           command: |
-            d1 migrations apply DB --env production
+            d1 migrations apply DB --remote --env production
             deploy --env production
