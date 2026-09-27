@@ -179,7 +179,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         MLDCard(
                           child: Text(
                             _error!,
-                            style: TextStyle(color: AppColors.textSecondary),
+                            style: const TextStyle(color: AppColors.textSecondary),
                           ),
                         )
                       else ...[
@@ -193,7 +193,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       const SizedBox(height: AppSpacing.xxl),
                       _bkashEntry(),
                       const SizedBox(height: AppSpacing.xl),
-                      Text(
+                      const Text(
                         'Core blocking is free forever. PRO is how you support development — it never gates your safety features.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -237,7 +237,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
           isPro
               ? 'PRO active — ${_subscription?.daysLeft ?? 0} day(s) left. Thank you.'
               : 'Unlock depth, keep every safety feature free.',
-          style: TextStyle(color: AppColors.textSecondary),
+          style: const TextStyle(color: AppColors.textSecondary),
         ),
       ],
     );
@@ -272,7 +272,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         TextSpan(text: '${p.$1}  '),
                         TextSpan(
                           text: p.$2,
-                          style: TextStyle(color: AppColors.textDisabled),
+                          style: const TextStyle(color: AppColors.textDisabled),
                         ),
                       ])),
                     ),
@@ -280,7 +280,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ),
               )),
           const SizedBox(height: AppSpacing.sm),
-          Text(
+          const Text(
             'Always free: sessions, cage, monk mode, prime commit, reels protection, emergency codes.',
             style: TextStyle(color: AppColors.textDisabled, fontSize: 12),
           ),
@@ -299,8 +299,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('PRO active',
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                const Text('PRO active',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
                 Text(
                   _subscription?.plan == 'trial'
                       ? 'Free trial — ends ${_subscription?.expiry?.toLocal().toString().split(' ').first ?? 'soon'}'

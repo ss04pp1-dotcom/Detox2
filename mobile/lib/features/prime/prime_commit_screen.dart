@@ -221,10 +221,10 @@ class _PrimeCommitScreenState extends State<PrimeCommitScreen> {
                   onPressed: _giveUp,
                 ),
               ] else ...[
-                MLDCard(
+                const MLDCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text('All-or-nothing window',
                           style: TextStyle(
                               fontWeight: FontWeight.w700, fontSize: 15)),
@@ -265,7 +265,7 @@ class _PrimeCommitScreenState extends State<PrimeCommitScreen> {
                   onPressed: _activate,
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                Text(
+                const Text(
                   'Tip: enroll your emergency code sheet first (Settings → '
                   'Emergency Codes) — without it there is NO exit until the '
                   'timer ends.',
@@ -279,15 +279,6 @@ class _PrimeCommitScreenState extends State<PrimeCommitScreen> {
         ),
       ),
     );
-  }
-
-  String _fmt(int seconds) {
-    final h = seconds ~/ 3600;
-    final m = (seconds % 3600) ~/ 60;
-    final s = seconds % 60;
-    return h > 0
-        ? '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}'
-        : '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   /// "12h 45m" / "45m" — for the status chip (v2.6 reference design).

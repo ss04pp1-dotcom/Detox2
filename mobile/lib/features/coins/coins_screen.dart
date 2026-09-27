@@ -121,7 +121,7 @@ class _CoinsScreenState extends State<CoinsScreen> {
                 const SizedBox(height: AppSpacing.xxl),
               ],
 
-              MLDSectionHeader(title: 'EARN'),
+              const MLDSectionHeader(title: 'EARN'),
               MLDCard(
                 child: Column(
                   children: [
@@ -146,7 +146,7 @@ class _CoinsScreenState extends State<CoinsScreen> {
                             ],
                           ),
                         ),
-                        MLDCoinBadge(amount: AppConstants.coinsPerAd),
+                        const MLDCoinBadge(amount: AppConstants.coinsPerAd),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xxl),
@@ -161,7 +161,7 @@ class _CoinsScreenState extends State<CoinsScreen> {
               ),
               const SizedBox(height: AppSpacing.xxl),
 
-              MLDSectionHeader(title: 'SPEND'),
+              const MLDSectionHeader(title: 'SPEND'),
               _spendRow(
                 context,
                 icon: Icons.lock_open,

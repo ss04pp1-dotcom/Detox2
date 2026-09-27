@@ -305,6 +305,21 @@ class _CommitsTabState extends State<_CommitsTab> {
                     ),
         ),
         if (_busy) const LinearProgressIndicator(minHeight: 2),
+        // v2.7.1: restored the commitment-posting entry point — the sheet +
+        // API existed since v2.5.9 but no UI ever called them, so the
+        // Commits feed was read-only for our own users.
+        Positioned(
+          right: AppSpacing.lg,
+          bottom: AppSpacing.lg,
+          child: FloatingActionButton.extended(
+            heroTag: 'communityNewCommit',
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.onPrimary,
+            onPressed: _busy ? null : _create,
+            icon: const Icon(Icons.campaign_outlined),
+            label: const Text('New Commit'),
+          ),
+        ),
       ],
     );
   }
@@ -625,7 +640,9 @@ class _ReferralTabState extends State<_ReferralTab> {
                               // (no share-sheet dependency by design).
                               await Clipboard.setData(ClipboardData(
                                   text: 'https://maxleveldetox.com/r/$code'));
-                              if (!mounted) return;
+                              // v2.7.1: guard the context itself (linter:
+                              // unrelated-mounted check pattern).
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                     content: Text('Invite link copied')),
@@ -655,9 +672,9 @@ class _ReferralTabState extends State<_ReferralTab> {
                   children: [
                     const MLDSectionHeader(title: 'Have a friend\'s code?'),
                     const SizedBox(height: AppSpacing.sm),
-                    Text(
+                    const Text(
                       'Applied once per account, within 7 days of signing up.',
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: AppColors.textSecondary, fontSize: 12),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -694,8 +711,8 @@ class _ReferralTabState extends State<_ReferralTab> {
                 const SizedBox(height: AppSpacing.md),
                 ...pending.map((p) => ListTile(
                       leading: const Icon(Icons.card_giftcard),
-                      title: Text('Claimable reward',
-                          style: const TextStyle(fontSize: 14)),
+                      title: const Text('Claimable reward',
+                          style: TextStyle(fontSize: 14)),
                       trailing: TextButton(
                         onPressed: () async {
                           await ApiClient.instance.claimReferralReward(
@@ -743,12 +760,10 @@ class _LeaderboardTab extends StatefulWidget {
 
 class _LeaderboardTabState extends State<_LeaderboardTab> {
   static const _windows = ['weekly', 'monthly', 'alltime'];
-  static const _windowLabels = ['Week', 'Month', 'All-time'];
 
   bool _loading = true;
   bool _busy = false;
   bool _optedIn = false;
-  String _displayMode = 'name';
   int _globalRank = 0;
   int _lifetimeDp = 0;
   int _streakDays = 0;
@@ -769,7 +784,6 @@ class _LeaderboardTabState extends State<_LeaderboardTab> {
     if (!mounted) return;
     if (me != null) {
       _optedIn = me['optedIn'] == true;
-      _displayMode = (me['displayMode'] as String?) ?? 'name';
       _globalRank = (me['globalRank'] as num?)?.toInt() ?? 0;
       final profile = me['profile'];
       if (profile is Map) {
@@ -1328,7 +1342,7 @@ class _LeaderboardTabState extends State<_LeaderboardTab> {
         ),
         const SizedBox(height: AppSpacing.md),
         if (_clubEntries.isNotEmpty) ...[
-          MLDSectionHeader(title: 'Club board'),
+          const MLDSectionHeader(title: 'Club board'),
           const SizedBox(height: AppSpacing.md),
           ..._clubEntries.map(_entryTile),
         ],

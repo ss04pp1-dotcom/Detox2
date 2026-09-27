@@ -69,7 +69,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final p = _pages[_page];
     return Scaffold(
       body: SafeArea(
         child: Column(

@@ -109,7 +109,7 @@ class _TempUnlockScreenState extends State<TempUnlockScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  MLDCoinBadge(amount: AppConstants.tempUnlockCost, large: true),
+                  const MLDCoinBadge(amount: AppConstants.tempUnlockCost, large: true),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Icon(Icons.arrow_forward, color: AppColors.textSecondary),
@@ -128,7 +128,7 @@ class _TempUnlockScreenState extends State<TempUnlockScreen> {
                   style: AppTypography.timer(size: 34, color: AppColors.warning)),
               const SizedBox(height: AppSpacing.xxl),
 
-              MLDSectionHeader(title: 'CHOOSE ACCESS'),
+              const MLDSectionHeader(title: 'CHOOSE ACCESS'),
               for (final (pkg, label, icon) in _unlockable)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.md),

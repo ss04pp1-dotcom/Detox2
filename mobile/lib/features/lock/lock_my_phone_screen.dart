@@ -143,9 +143,9 @@ class _LockMyPhoneScreenState extends State<LockMyPhoneScreen> {
                         size: 40,
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      Text(
+                      const Text(
                         'Unlock with coins or wait for the timer.',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppColors.textSecondary, fontSize: 13),
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -268,12 +268,6 @@ class _LockMyPhoneScreenState extends State<LockMyPhoneScreen> {
 
   String _minutesLabel(int m) =>
       m < 60 ? '$m min' : '${m ~/ 60} hr${m >= 120 ? 's' : ''}';
-
-  String _fmt(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
 
   /// "2h 30m" / "45m" — for the status chip (v2.6 reference design).
   String _fmtLong(int s) {

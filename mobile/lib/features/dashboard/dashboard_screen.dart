@@ -63,12 +63,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
           height: 68,
-          destinations: [
-            const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-            const NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Insights'),
-            const NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: 'Community'),
-            const NavigationDestination(icon: Icon(Icons.checklist_outlined), selectedIcon: Icon(Icons.checklist), label: 'Tasks'),
-            const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
+            NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Insights'),
+            NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: 'Community'),
+            NavigationDestination(icon: Icon(Icons.checklist_outlined), selectedIcon: Icon(Icons.checklist), label: 'Tasks'),
+            NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
           ],
         ),
       ),
@@ -488,7 +488,7 @@ class _QuickActions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        MLDSectionHeader(title: 'QUICK ACTIONS'),
+        const MLDSectionHeader(title: 'QUICK ACTIONS'),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
@@ -557,7 +557,7 @@ class _MoreTools extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        MLDSectionHeader(title: 'MORE TOOLS'),
+        const MLDSectionHeader(title: 'MORE TOOLS'),
         _tool(
           context,
           icon: Icons.block_outlined,

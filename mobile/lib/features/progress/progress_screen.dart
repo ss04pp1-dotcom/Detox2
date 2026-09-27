@@ -265,7 +265,7 @@ class _StreakCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MLDSectionHeader(title: 'STREAK'),
+          const MLDSectionHeader(title: 'STREAK'),
           Row(
             children: [
               Icon(
@@ -485,7 +485,7 @@ class _MilestonesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MLDSectionHeader(title: 'MILESTONES'),
+          const MLDSectionHeader(title: 'MILESTONES'),
           ...streak.milestones.map((m) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 child: Row(
@@ -534,7 +534,7 @@ class _DpHistoryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MLDSectionHeader(title: 'RECENT DISCIPLINE POINTS'),
+          const MLDSectionHeader(title: 'RECENT DISCIPLINE POINTS'),
           if (awards.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
@@ -582,7 +582,7 @@ class _RelapseCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MLDSectionHeader(title: 'RELAPSE HISTORY'),
+          const MLDSectionHeader(title: 'RELAPSE HISTORY'),
           if (relapses.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),

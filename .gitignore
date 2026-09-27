@@ -1,0 +1,48 @@
+# MAXLEVEL DETOX — repo-wide ignore (v2.7.1: restored; a prior version was
+# lost during a re-clone, which left build artifacts untracked-but-visible).
+
+# --- Flutter / Dart (mobile/) ---
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/build/
+**/.fvm/
+**/coverage/
+**/lib/generated_plugin_registrant.dart
+*.dart_tool
+mobile/.metadata
+
+# --- Android (mobile/android/) ---
+# NOTE: android/gradle/wrapper/gradle-wrapper.jar IS tracked (standard
+# wrapper distribution); tracked files are unaffected by these patterns.
+**/.gradle/
+**/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
+**/captures/
+**/.externalNativeBuild/
+**/.cxx/
+
+# --- Node (worker/ admin/) ---
+**/node_modules/
+**/.npm/
+**/dist/
+**/.vite/
+**/coverage/
+
+# --- Cloudflare / wrangler ---
+**/.wrangler/
+**/.dev.vars
+**/*.pem
+
+# --- IDE / OS ---
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+*.log

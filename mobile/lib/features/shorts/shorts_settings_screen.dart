@@ -53,7 +53,7 @@ class _ShortsSettingsScreenState extends State<ShortsSettingsScreen> {
               ),
               const SizedBox(height: AppSpacing.xxl),
 
-              MLDSectionHeader(title: 'SUPPORTED APPS'),
+              const MLDSectionHeader(title: 'SUPPORTED APPS'),
               if (shorts.platforms.isEmpty)
                 const MLDWarningBanner(
                   message: 'Platform list is loading from the enforcement engine…',
@@ -66,7 +66,7 @@ class _ShortsSettingsScreenState extends State<ShortsSettingsScreen> {
                 ],
               const SizedBox(height: AppSpacing.xxl),
 
-              MLDSectionHeader(title: 'ESCALATION'),
+              const MLDSectionHeader(title: 'ESCALATION'),
               MLDCard(
                 child: Column(
                   children: [

@@ -123,9 +123,9 @@ class _MLDHoldToConfirmButtonState extends State<MLDHoldToConfirmButton> {
   }
 
   Future<void> _tick() async {
-    final stepMs = 20;
+    const stepMs = 20;
     while (_holding && _progress < 1) {
-      await Future<void>.delayed(Duration(milliseconds: stepMs));
+      await Future<void>.delayed(const Duration(milliseconds: stepMs));
       if (!_mounted || !_holding) return;
       setState(() {
         _progress = (_progress + stepMs / widget.duration.inMilliseconds).clamp(0.0, 1.0);
@@ -316,7 +316,7 @@ class MLDEmptyState extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(AppSpacing.xl),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.elevated,
                 shape: BoxShape.circle,
               ),

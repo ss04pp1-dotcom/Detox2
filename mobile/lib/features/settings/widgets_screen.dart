@@ -141,7 +141,7 @@ class _WidgetsScreenState extends State<WidgetsScreen> {
                       subtitle: '7-day chart: screen-time vs reels skipped — tap the widget to switch',
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    Text(
+                    const Text(
                       'Widgets update on session changes, progress changes and every 30 minutes. They never hold enforcement authority — tap opens the app.',
                       textAlign: TextAlign.center,
                       style:

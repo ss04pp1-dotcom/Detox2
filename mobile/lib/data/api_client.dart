@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,9 +41,8 @@ class ApiClient {
   // still returns null from every method, but login/paywall/support screens
   // can now distinguish offline vs. wrong-credentials vs. rate-limited
   // instead of showing a generic "did not work".
-  @visibleForTesting
+  // v2.7.1: annotations dropped — these are runtime UI surfaces, not test-only.
   String? lastErrorCode;
-  @visibleForTesting
   String? lastErrorMessage;
 
   /// Human-readable message for the most recent failure (null when the last
@@ -637,7 +635,9 @@ class ApiClient {
         lastErrorMessage = error?['message'] as String?;
         if (code == 'UNAUTHORIZED' && authenticated && retry == 0) {
           if (await _tryRefresh()) {
-            return _send(method, path, body, authenticated, 1);
+            // v2.7.1: await the retry so a failing second pass flows
+            // through this method's own catch (never throws to callers).
+            return await _send(method, path, body, authenticated, 1);
           }
         }
         return null;

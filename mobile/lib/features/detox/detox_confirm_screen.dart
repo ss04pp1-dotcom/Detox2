@@ -14,7 +14,7 @@ class DetoxConfirmScreen extends StatelessWidget {
     final args =
         ModalRoute.of(context)?.settings.arguments is DetoxConfirmArgs
             ? ModalRoute.of(context)!.settings.arguments as DetoxConfirmArgs
-            : DetoxConfirmArgs(durationMinutes: 120, strictness: 'MAXLEVEL');
+            : const DetoxConfirmArgs(durationMinutes: 120, strictness: 'MAXLEVEL');
 
     final durationLabel = args.durationMinutes >= 60
         ? '${args.durationMinutes ~/ 60}h${args.durationMinutes % 60 > 0 ? ' ${args.durationMinutes % 60}m' : ''}'

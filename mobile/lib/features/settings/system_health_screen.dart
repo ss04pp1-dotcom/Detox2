@@ -182,7 +182,7 @@ class _SystemHealthScreenState extends State<SystemHealthScreen> {
                         ),
                         _row('Session', '${r['sessionStatus']}'),
                         _row('Cage active', '${r['cageActive']}'),
-                        _row('Shorts blocker', '${r['shortsEnabled'] == true ? 'on' : 'off'}'),
+                        _row('Shorts blocker', r['shortsEnabled'] == true ? 'on' : 'off'),
                       ]),
                       _section('NATIVE ERRORS (${(r['nativeErrors'] as List?)?.length ?? 0})', [
                         if ((r['nativeErrors'] as List? ?? const []).isEmpty)

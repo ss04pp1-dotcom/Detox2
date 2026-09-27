@@ -235,7 +235,7 @@ class _StudySetupScreenState extends State<StudySetupScreen> {
             const SizedBox(height: AppSpacing.xxl),
           ],
 
-          MLDSectionHeader(title: 'DURATION'),
+          const MLDSectionHeader(title: 'DURATION'),
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
@@ -260,7 +260,7 @@ class _StudySetupScreenState extends State<StudySetupScreen> {
           ),
           const SizedBox(height: AppSpacing.xxl),
 
-          MLDSectionHeader(title: 'SUBJECT (OPTIONAL)'),
+          const MLDSectionHeader(title: 'SUBJECT (OPTIONAL)'),
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
@@ -304,7 +304,7 @@ class _StudySetupScreenState extends State<StudySetupScreen> {
           ],
           const SizedBox(height: AppSpacing.xxl),
 
-          MLDSectionHeader(title: 'APPS TO BLOCK'),
+          const MLDSectionHeader(title: 'APPS TO BLOCK'),
           for (final (key, label, icon) in _categories)
             _categoryTile(
               icon: icon,
@@ -314,7 +314,7 @@ class _StudySetupScreenState extends State<StudySetupScreen> {
             ),
           const SizedBox(height: AppSpacing.xxl),
 
-          MLDSectionHeader(title: 'APPS YOU NEED (ALLOWLIST)'),
+          const MLDSectionHeader(title: 'APPS YOU NEED (ALLOWLIST)'),
           for (final (id, label, _) in _allowOptions)
               _allowTile(
                 label: label,
@@ -511,7 +511,7 @@ class _DetoxSetupScreenState extends State<DetoxSetupScreen> {
             const SizedBox(height: AppSpacing.xxl),
           ],
 
-          MLDSectionHeader(title: 'DURATION'),
+          const MLDSectionHeader(title: 'DURATION'),
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
@@ -523,7 +523,7 @@ class _DetoxSetupScreenState extends State<DetoxSetupScreen> {
           ),
           const SizedBox(height: AppSpacing.xxl),
 
-          MLDSectionHeader(title: 'STRICTNESS'),
+          const MLDSectionHeader(title: 'STRICTNESS'),
           _strictnessTile(
             value: 'BALANCED',
             title: 'Balanced',

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants.dart';
 import '../../core/theme/tokens.dart';
 import '../../data/api_client.dart';
 import '../../shared/mld_widgets.dart';
@@ -141,7 +140,7 @@ class _SupportScreenState extends State<SupportScreen> {
                     Text('NEW TICKET', style: AppTypography.caption(weight: FontWeight.w800)),
                     const SizedBox(height: AppSpacing.md),
                     DropdownButtonFormField<String>(
-                      value: _category,
+                      initialValue: _category,
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
@@ -192,7 +191,7 @@ class _SupportScreenState extends State<SupportScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ))
               else if (_tickets.isEmpty)
-                MLDEmptyState(
+                const MLDEmptyState(
                   icon: Icons.inbox_outlined,
                   title: 'No tickets yet',
                   message: 'Anything you submit shows up here with our reply.',

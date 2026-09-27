@@ -68,6 +68,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          # v2.7.1: pinned to the verified build toolchain so the lint gate
+          # matches local/CI behavior (latest-stable introduced new rules).
+          flutter-version: 3.44.9
           channel: stable
           cache: true
       - run: flutter pub get

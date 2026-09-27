@@ -172,10 +172,10 @@ class _MonkModeScreenState extends State<MonkModeScreen> {
                   color: AppColors.monk,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Text(
+                const Text(
                   'Only allowed apps are accessible. Stay strong!',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -187,7 +187,7 @@ class _MonkModeScreenState extends State<MonkModeScreen> {
                       color: AppColors.textDisabled, fontSize: 12),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                MLDStatusChip(
+                const MLDStatusChip(
                   label: 'EMERGENCY CALL AVAILABLE',
                   color: AppColors.success,
                   icon: Icons.call_outlined,
@@ -248,10 +248,10 @@ class _MonkModeScreenState extends State<MonkModeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              MLDCard(
+              const MLDCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text('Allowlist-only lockdown',
                         style: TextStyle(
                             fontWeight: FontWeight.w700, fontSize: 15)),

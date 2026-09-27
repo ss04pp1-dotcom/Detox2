@@ -128,9 +128,9 @@ class _EmergencyCodesScreenState extends State<EmergencyCodesScreen> {
                       MLDCard(
                         child: Column(
                           children: [
-                            Text(
+                            const Text(
                               'Secret (write it down NOW):',
-                              style: const TextStyle(
+                              style: TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 12),
                             ),

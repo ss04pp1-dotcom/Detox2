@@ -29,7 +29,6 @@ class _BkashScreenState extends State<BkashScreen> {
   _Stage _stage = _Stage.pickPlan;
   bool _loading = true;
   bool _busy = false;
-  String? _error;
 
   bool _gatewayEnabled = false;
   String _number = '';
@@ -57,7 +56,6 @@ class _BkashScreenState extends State<BkashScreen> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
     });
 
     final info = await ApiClient.instance.fetchBkashInstructions();
@@ -188,7 +186,7 @@ class _BkashScreenState extends State<BkashScreen> {
 
   Widget _body() {
     if (!_gatewayEnabled) {
-      return MLDEmptyState(
+      return const MLDEmptyState(
         icon: Icons.credit_card_off,
         title: 'bKash is paused',
         message:
@@ -211,7 +209,7 @@ class _BkashScreenState extends State<BkashScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MLDSectionHeader(title: 'Choose a plan'),
+        const MLDSectionHeader(title: 'Choose a plan'),
         const SizedBox(height: AppSpacing.md),
         ..._plans.map((plan) => Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -285,7 +283,7 @@ class _BkashScreenState extends State<BkashScreen> {
           ),
         ],
         const SizedBox(height: AppSpacing.xxl),
-        MLDSectionHeader(title: 'Step 2 — Submit the TrxID'),
+        const MLDSectionHeader(title: 'Step 2 — Submit the TrxID'),
         const SizedBox(height: AppSpacing.md),
         MLDCard(
           child: Column(
@@ -369,7 +367,7 @@ class _BkashScreenState extends State<BkashScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MLDSectionHeader(title: 'Your payments'),
+        const MLDSectionHeader(title: 'Your payments'),
         const SizedBox(height: AppSpacing.md),
         ..._history.take(10).map((p) => Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),

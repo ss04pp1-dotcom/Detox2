@@ -102,7 +102,7 @@ class NativeBridge {
         }
         return NativeResult.ok(map['data'] as Map<dynamic, dynamic>? ?? const {});
       }
-      return NativeResult.ok(const {});
+      return const NativeResult.ok({});
     } on PlatformException catch (e) {
       return NativeResult.err(NativeError(e.code, e.message ?? 'platform error'));
     } catch (e) {
@@ -505,7 +505,7 @@ class NativeBridge {
     final r = await call('getProgress');
     if (!r.isOk) return NativeResult.err(r.error);
     final raw = r.data;
-    if (raw == null) return NativeResult.err(const NativeError('NO_DATA', 'Empty progress payload'));
+    if (raw == null) return const NativeResult.err(NativeError('NO_DATA', 'Empty progress payload'));
     return NativeResult.ok(
         ProgressSnapshot.fromJson(Map<dynamic, dynamic>.from(raw)));
   }

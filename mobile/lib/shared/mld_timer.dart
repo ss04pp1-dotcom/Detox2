@@ -87,8 +87,8 @@ class _RingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // v2.6 reference design: thick 10px stroke with rounded caps and a soft
     // accent glow behind the arc (mockup "Glow Effects").
-    final stroke = 10.0;
-    final glow = stroke * 2.2;
+    const stroke = 10.0;
+    const glow = stroke * 2.2;
     final rect = Offset.zero & size;
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.shortestSide - stroke) / 2;

@@ -52,7 +52,12 @@ android {
         applicationId = "com.maxleveldet0x"
         minSdk = 26          // Android 8.0 — covers ~98% of active devices
         targetSdk = 35
-        versionCode = 26
+        versionCode = 27
+        // 2.7.1 (r14) — CI-green cleanup: analyzer zero-issue pass (const
+        // migrations, dead code, RadioGroup migration), community Commits
+        // posting restored (New Commit FAB — the sheet+API existed since
+        // v2.5.9 but no UI called them), auth-retry await fix, CI pinned
+        // to the verified Flutter 3.44.9 — see docs/R14-CHANGES.md.
         // 2.7.0 (r13) — user-reported fixes: reels/shorts now redirect
         // IN-APP to the platform's safe surface (YouTube Home / FB Feed /
         // IG Feed) instead of kicking out; emergency = dialer-ONLY
@@ -60,7 +65,7 @@ android {
         // safety cap); Insights APP USAGE TODAY card (per-app minutes);
         // API timeout 12s->6s + local-midnight usage window — see
         // docs/R13-CHANGES.md.
-        versionName = "2.7.0"
+        versionName = "2.7.1"
         ndk {
             // r7-era distribution target: single-ABI arm64 release (no
             // split-per-abi versionCode offsets — keeps versionCode pure).

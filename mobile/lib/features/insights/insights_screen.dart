@@ -119,7 +119,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                MLDSectionHeader(title: 'FOCUS TIME'),
+                const MLDSectionHeader(title: 'FOCUS TIME'),
                 if (stats == null)
                   const Center(child: Padding(
                     padding: EdgeInsets.all(AppSpacing.xxl),
@@ -139,7 +139,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                MLDSectionHeader(title: 'DETOX TIME'),
+                const MLDSectionHeader(title: 'DETOX TIME'),
                 if (stats == null)
                   const SizedBox(height: 80)
                 else
@@ -161,7 +161,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  MLDSectionHeader(title: 'DISTRACTION TREND'),
+                  const MLDSectionHeader(title: 'DISTRACTION TREND'),
                   const SizedBox(height: AppSpacing.sm),
                   MLDBarChart(
                     values: _trendDays
@@ -194,7 +194,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  MLDSectionHeader(title: 'TOP DISTRACTING APPS TODAY'),
+                  const MLDSectionHeader(title: 'TOP DISTRACTING APPS TODAY'),
                   const SizedBox(height: AppSpacing.sm),
                   ...List.generate(_topApps.length, (i) {
                     final app = _topApps[i];
@@ -245,7 +245,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                MLDSectionHeader(title: 'APP USAGE TODAY'),
+                const MLDSectionHeader(title: 'APP USAGE TODAY'),
                 const SizedBox(height: AppSpacing.sm),
                 if (_usage.isEmpty)
                   Text(

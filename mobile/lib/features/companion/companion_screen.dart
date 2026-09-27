@@ -283,14 +283,26 @@ class _CompanionSettingsSheetState extends State<_CompanionSettingsSheet> {
           children: [
             const MLDSectionHeader(title: 'Persona'),
             const SizedBox(height: AppSpacing.md),
-            ..._options.entries.map(
-              (e) => RadioListTile<String>(
-                value: e.key,
-                groupValue: _personality,
-                onChanged: (v) => setState(() => _personality = v!),
-                title: Text(e.value, style: const TextStyle(fontSize: 14)),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
+            // v2.7.1: Radio.groupValue/onChanged deprecated after v3.32 —
+            // migrated to the RadioGroup ancestor pattern.
+            RadioGroup<String>(
+              groupValue: _personality,
+              onChanged: (v) {
+                if (v != null) setState(() => _personality = v);
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final e in _options.entries)
+                    RadioListTile<String>(
+                      value: e.key,
+                      title:
+                          Text(e.value, style: const TextStyle(fontSize: 14)),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                ],
               ),
             ),
             SwitchListTile(
