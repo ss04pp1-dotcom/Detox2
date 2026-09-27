@@ -145,14 +145,14 @@ class TrendWidgetProvider : AppWidgetProvider() {
 
         val density = context.resources.displayMetrics.density
         val options = manager.getAppWidgetOptions(appWidgetId)
-        val widthDp = options.getInt(AppWidgetManager.OPTION_MIN_WIDTH).takeIf { it > 0 } ?: 220
+        val widthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH).takeIf { it > 0 } ?: 220
         val chartWidth = (minOf(maxOf(widthDp, 180), 400) * density).toInt()
         val chartHeight = (96 * density).toInt()
         val bitmap = drawChart(context, values, labels, series, chartWidth, chartHeight)
         views.setImageViewBitmap(R.id.widget_trend_chart, bitmap)
 
         // Interactivity: title -> app, chart -> toggle this instance's series.
-        views.setOnClickPendingIntent(R.id.widget_trend_title, openAppPendingIntent(context))
+        views.setOnClickPendingIntent(R.id.widget_trend_title, MldWidgetProvider.openAppPendingIntent(context))
         views.setOnClickPendingIntent(R.id.widget_trend_chart, togglePendingIntent(context, appWidgetId))
 
         manager.updateAppWidget(appWidgetId, views)

@@ -309,9 +309,12 @@ object WidgetUpdater {
 
     /**
      * Ask the launcher to pin a widget (API 26+, our minSdk). Returns
-     * false when the launcher does not support pinning.
+     * false when the launcher does not support pinning. Accepts any MLD
+     * widget provider — including TrendWidgetProvider, which deliberately
+     * extends AppWidgetProvider directly (custom chart rendering) rather
+     * than the title/value/sub MldWidgetProvider base.
      */
-    fun requestPin(context: Context, providerClass: Class<out MldWidgetProvider>): Boolean {
+    fun requestPin(context: Context, providerClass: Class<out AppWidgetProvider>): Boolean {
         return try {
             val manager = AppWidgetManager.getInstance(context) ?: return false
             if (!manager.isRequestPinAppWidgetSupported) return false

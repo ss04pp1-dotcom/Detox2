@@ -103,8 +103,9 @@ abstract final class AppTypography {
   static TextStyle section({Color color = AppColors.textPrimary, FontWeight weight = FontWeight.w700}) =>
       GoogleFonts.inter(fontSize: 19, height: 1.2, fontWeight: weight, color: color);
 
-  static TextStyle body({Color color = AppColors.textPrimary, FontWeight weight = FontWeight.w400, double? height}) =>
-      GoogleFonts.inter(fontSize: 15, height: height ?? 1.5, fontWeight: weight, color: color);
+  static TextStyle body(
+          {Color color = AppColors.textPrimary, FontWeight weight = FontWeight.w400, double? height, double? fontSize}) =>
+      GoogleFonts.inter(fontSize: fontSize ?? 15, height: height ?? 1.5, fontWeight: weight, color: color);
 
   static TextStyle caption({Color? color, FontWeight weight = FontWeight.w500}) =>
       GoogleFonts.inter(fontSize: 13, height: 1.4, fontWeight: weight, color: color ?? AppColors.textSecondary);
