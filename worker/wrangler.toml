@@ -7,7 +7,6 @@ name = "mld-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 workers_dev = true
-migrations_dir = "src/db/migrations"
 
 [observability]
 enabled = true
@@ -27,6 +26,7 @@ ADMIN_ORIGIN = "https://admin.maxleveldetox.com"
 binding = "DB"
 database_name = "mld-db-production"
 database_id = "d8230d47-2d65-4a9b-be52-10ec8d057db8"
+migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "KV"
@@ -96,6 +96,7 @@ ADMIN_ORIGIN = "https://admin.maxleveldetox.com"
 binding = "DB"
 database_name = "mld-db-production"
 database_id = "d8230d47-2d65-4a9b-be52-10ec8d057db8"
+migrations_dir = "migrations"
 
 [[env.production.kv_namespaces]]
 binding = "KV"
