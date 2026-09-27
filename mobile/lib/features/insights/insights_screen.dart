@@ -35,6 +35,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
   Map<String, dynamic>? _opportunityCost;
   List<Map<String, dynamic>> _trendDays = const [];
 
+  // v2.5.9 (r11.2) — today's top distracting apps (display-only ranking).
+  List<Map<String, dynamic>> _topApps = const [];
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +49,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
     final subRes = await ApiClient.instance.fetchSubscription();
     final cost = await NativeBridge.instance.getOpportunityCost();
     final trend = await NativeBridge.instance.getDistractionTrend();
+    final topApps = await NativeBridge.instance.getTopDistractingApps();
     if (!mounted) return;
     setState(() {
       _stats = stats;
@@ -53,6 +57,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
         _opportunityCost = cost;
       }
       _trendDays = trend;
+      _topApps = topApps;
       if (subRes != null && subRes['subscription'] is Map) {
         _subscription = SubscriptionInfo.fromJson(
             Map<dynamic, dynamic>.from(subRes['subscription'] as Map));
@@ -161,6 +166,58 @@ class _InsightsScreenState extends State<InsightsScreen> {
                     '${_trendDays.fold<int>(0, (sum, d) => sum + (((d['reelsBlocked'] as num?) ?? 0).toInt()))}',
                     style: AppTypography.caption(),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+          ],
+
+          // v2.5.9 (r11.2) — TOP DISTRACTING APPS: where today's distraction
+          // minutes actually went. Honest ranking, no shaming copy; hidden
+          // on a quiet day (empty list).
+          if (_topApps.isNotEmpty) ...[
+            MLDCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  MLDSectionHeader(title: 'TOP DISTRACTING APPS TODAY'),
+                  const SizedBox(height: AppSpacing.sm),
+                  ...List.generate(_topApps.length, (i) {
+                    final app = _topApps[i];
+                    final minutes =
+                        ((app['minutesToday'] as num?) ?? 0).toInt();
+                    return Padding(
+                      padding: EdgeInsets.only(
+                          bottom: i == _topApps.length - 1
+                              ? 0
+                              : AppSpacing.md),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 22,
+                            child: Text('${i + 1}',
+                                style: AppTypography.caption()),
+                          ),
+                          Expanded(
+                            child: Text(
+                              (app['appName'] as String?) ??
+                                  (app['packageName'] as String?) ??
+                                  'Unknown',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.body(),
+                            ),
+                          ),
+                          Text(
+                            minutes >= 60
+                                ? '${minutes ~/ 60}h ${minutes % 60}m'
+                                : '${minutes}m',
+                            style: AppTypography.caption(),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),

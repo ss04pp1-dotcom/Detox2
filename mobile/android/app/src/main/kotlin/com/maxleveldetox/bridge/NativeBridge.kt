@@ -1031,6 +1031,15 @@ class NativeBridge(private val context: Context) : MethodChannel.MethodCallHandl
                     kotlinx.coroutines.runBlocking {
                         com.maxleveldetox.growth.OpportunityCostEngine.trendJson(context)
                     })
+                // v2.5.9 (r11.2) — today's top distracting apps for the
+                // Insights "TOP DISTRACTING APPS" card (display-only).
+                "getTopDistractingApps" -> ok(
+                    JSONObject().put(
+                        "apps",
+                        kotlinx.coroutines.runBlocking {
+                            com.maxleveldetox.monitor.BrainRotEngine
+                                .topDistractingAppsJson(context)
+                        }))
                 "claimCheckIn" -> {
                     val awarded = app.progressEngine.claimCheckIn()
                     if (awarded > 0) {

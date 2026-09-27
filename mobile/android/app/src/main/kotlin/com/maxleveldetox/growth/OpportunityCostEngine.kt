@@ -144,7 +144,10 @@ object OpportunityCostEngine {
 
     private fun lastSevenDayKeys(): List<String> {
         val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        return (0..6).map { back ->
+        // Oldest first (6 days ago -> today) — matches the trend widget's
+        // series order and the FOCUS/DETOX charts' Mon..Sun convention, so
+        // every chart in the app reads left-to-right across time.
+        return (6 downTo 0).map { back ->
             val cal = Calendar.getInstance()
             cal.add(Calendar.DAY_OF_YEAR, -back)
             fmt.format(cal.time)

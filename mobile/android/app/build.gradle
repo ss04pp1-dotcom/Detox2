@@ -52,11 +52,11 @@ android {
         applicationId = "com.maxleveldet0x"
         minSdk = 26          // Android 8.0 — covers ~98% of active devices
         targetSdk = 35
-        versionCode = 23
+        versionCode = 24
         // 2.5.9 = 2.5.6 (audit fixes) + r10 fixes + r11 roadmap (leaderboard,
         // clubs, dynamic detection rules, trend widget) + r11.1 opportunity
         // cost nudges — see docs/R9-R11.1-CHANGES.md.
-        versionName = "2.5.9"
+        versionName = "2.5.10"
         ndk {
             // r7-era distribution target: single-ABI arm64 release (no
             // split-per-abi versionCode offsets — keeps versionCode pure).

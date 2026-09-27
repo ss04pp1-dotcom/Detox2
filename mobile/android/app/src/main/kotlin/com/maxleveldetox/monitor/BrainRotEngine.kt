@@ -15,6 +15,7 @@ import android.widget.TextView
 import com.maxleveldetox.MldApp
 import com.maxleveldetox.accessibility.DiagLog
 import com.maxleveldetox.overlay.EnforcementWall
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -102,6 +103,39 @@ object BrainRotEngine {
             put("nextStageAtMinutes", nextAt)
         }
     }
+
+    /**
+     * v2.5.9 (r11.2) — today's most-used distracting apps, for the Insights
+     * "TOP DISTRACTING APPS" card. Display-only (same honesty rule as every
+     * other growth surface); reuses UsageTracker's already-sorted top-25
+     * foreground list, filtered by the SAME distracting classification the
+     * brain-rot stage uses. Computed off the main thread.
+     */
+    suspend fun topDistractingAppsJson(context: Context, limit: Int = 5): JSONArray =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val app = context.applicationContext as? MldApp
+                ?: return@withContext JSONArray()
+            try {
+                JSONArray().apply {
+                    app.usageTracker.todayUsage()
+                        .filter {
+                            it.minutesToday > 0 &&
+                                app.policyEngine.isDistracting(it.packageName)
+                        }
+                        .take(limit.coerceIn(1..10))
+                        .forEach { row ->
+                            put(JSONObject().apply {
+                                put("appName", row.appName)
+                                put("packageName", row.packageName)
+                                put("minutesToday", row.minutesToday)
+                            })
+                        }
+                }
+            } catch (_: Exception) {
+                // Usage access revoked / OEM quirk — an empty card, not a crash.
+                JSONArray()
+            }
+        }
 
     // -----------------------------------------------------------------
     // HUD pill (non-blocking)

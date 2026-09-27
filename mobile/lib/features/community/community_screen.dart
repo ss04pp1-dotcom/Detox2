@@ -776,6 +776,16 @@ class _LeaderboardTabState extends State<_LeaderboardTab> {
       }
       final club = me['club'];
       _club = club is Map ? club : null;
+      // v2.5.9 fix: mirror the SERVER opt-in into the local sync flag so the
+      // periodic DP snapshot sync (main.dart) resumes after a reinstall or
+      // on a second device — otherwise the board would go permanently stale
+      // (the local pref defaults false and nothing else ever sets it).
+      if (_optedIn) {
+        final prefs = await SharedPreferences.getInstance();
+        if (prefs.getBool('mld_leaderboard_opted_in') != true) {
+          await prefs.setBool('mld_leaderboard_opted_in', true);
+        }
+      }
     }
     setState(() => _loading = false);
     if (_optedIn) {

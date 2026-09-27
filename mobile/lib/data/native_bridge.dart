@@ -459,6 +459,18 @@ class NativeBridge {
         .toList();
   }
 
+  /// v2.5.9 (r11.2) — today's most-used distracting apps (display-only),
+  /// for the Insights "TOP DISTRACTING APPS" card:
+  /// [{appName, packageName, minutesToday}] sorted by minutes desc.
+  Future<List<Map<String, dynamic>>> getTopDistractingApps() async {
+    final r = await call('getTopDistractingApps');
+    if (!r.isOk) return const [];
+    final apps = r.data?['apps'] as List<dynamic>? ?? const [];
+    return apps
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
   // ---------------------------------------------------------------------
   // Emergency
   // ---------------------------------------------------------------------
