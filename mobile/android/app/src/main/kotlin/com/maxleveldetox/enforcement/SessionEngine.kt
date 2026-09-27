@@ -160,9 +160,8 @@ class SessionEngine(
         AnalyticsOut.post(
             if (mode == SessionMode.STUDY) "SESSION_STARTED_STUDY" else "SESSION_STARTED_DETOX",
             mapOf("mode" to mode.name, "durationMinutes" to duration))
-        // v2.5.5 audit fix M-3: a fresh DETOX session requests the kiosk
-        // trap (STUDY sessions are exempt — their allowlist may include
-        // education apps).
+        // v2.9 r17: sync the SESSION KIOSK (wall/strips) for both modes
+        // (STUDY included — the old screen pinning is gone).
         com.maxleveldetox.enforcement.KioskController.syncAsync(stateRepo)
 
         return StartResult(true, null, null)
@@ -428,9 +427,8 @@ class SessionEngine(
         }
 
         Broadcaster.emit()
-        // v2.5.5 audit fix M-3: keep the kiosk trap desired-state in sync
-        // after recovery (a DETOX session that survived process death must
-        // re-request screen pinning).
+        // v2.9 r17: re-sync the session kiosk after recovery (a session
+        // that survived process death must re-arm its wall/strips).
         com.maxleveldetox.enforcement.KioskController.syncAsync(stateRepo)
     }
 
@@ -468,7 +466,7 @@ class SessionEngine(
         cancelAlarm(EnforcementReceiver.ACTION_SESSION_END)
         cancelAlarm(EnforcementReceiver.ACTION_CAGE_END)
         EnforcementService.stop(context)
-        // v2.5.5 audit fix M-3: lift the kiosk pin when the session ends.
+        // v2.9 r17: disarm the session kiosk surfaces when the session ends.
         com.maxleveldetox.enforcement.KioskController.syncAsync(stateRepo)
 
         // History row.

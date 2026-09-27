@@ -1,151 +1,72 @@
 package com.maxleveldetox.enforcement
 
 import android.app.Activity
-import android.os.Handler
-import android.os.Looper
 import com.maxleveldetox.storage.StateRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.lang.ref.WeakReference
 
 /**
- * KioskController — the TRAP layer (user-reported v1.0.5 gap).
+ * KioskController — the SESSION KIOSK facade (v2.9 r17 rewrite).
  *
- * Blocking restricted apps is not enough: during a DETOX session the user
- * must not be able to wander off to the launcher either. Android's screen
- * pinning (user-consent LockTask) is the only OS-sanctioned way for a
- * normal app to truly disable HOME / RECENTS / BACK.
+ * HISTORY: this object used to drive user-consent screen pinning
+ * (Activity.startLockTask) during DETOX sessions. Pinning is escapable by
+ * design (hold Back + Recents), was never applied to STUDY, never covered
+ * the launcher or the notification shade, and while pinned the emergency
+ * dialer launch was BLOCKED by the OS — the classic "emergency exits,
+ * system fails" report. The user explicitly asked for pinning to be
+ * REPLACED by a real lockdown: "nothing works, no way out at all."
  *
- * Layered design:
- *   1. startLockTask() on MainActivity while a DETOX session is ACTIVE —
- *      OS level: HOME, RECENTS and the status bar are disabled. Requires a
- *      one-tap system consent dialog (Android's rule for non-device-owner
- *      apps; the price of a real hard lock).
- *   2. If pinning is declined or lost, DetoxAccessibilityService's
- *      snap-back pulls the app back to the foreground whenever the
- *      launcher appears (rubber-band effect).
- *   3. PopScope(canPop: false) on the Dart session screen swallows BACK.
+ * r17: pinning is GONE. The enforcement now lives in SessionKiosk
+ * (overlay/SessionKiosk.kt):
+ *   - a full-screen TYPE_ACCESSIBILITY_OVERLAY wall over the launcher /
+ *     settings / unknown apps / systemui surfaces,
+ *   - top+bottom strips over the status/nav bars while our own app or a
+ *     STUDY-allowlisted app is in the foreground,
+ *   - BACK/APP_SWITCH/HOME key consumption in the a11y key filter.
  *
- * Pinning is intentionally NOT used for STUDY sessions (their allowlist
- * may include education apps outside this one) and is lifted for temp
- * unlock windows, RECOVERY (the user must reach Settings), the emergency
- * dialer and the alarm — safety always outranks strictness (PRD §27).
- *
- * All state transitions flow through sync()/setRequested() which are
- * idempotent and safe to call from any thread, any number of times:
- *   - SessionEngine.startSession / finalizeLocked / recoverIfNeeded
- *   - TempUnlockManager.request / clear
- *   - PermissionMonitor (RECOVERY enter / resume)
- *   - EnforcementService 30s sweep (self-healing heartbeat)
+ * This facade keeps the historical call sites (SessionEngine,
+ * TempUnlockManager, MainActivity) — it forwards to SessionKiosk with the
+ * StateRepository's context.
  */
 object KioskController {
 
-    private val mainHandler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    private var activityRef: WeakReference<Activity>? = null
-
-    @Volatile private var resumed = false
-    @Volatile private var requested = false
-
-    /** Set optimistically after a startLockTask() call that did not throw.
-     *  Cleared on pause/unpin — the unpin gesture and our own stopLockTask
-     *  both pause the activity, so the flag tracks reality closely enough
-     *  without depending on ActivityManager API level differences. */
-    @Volatile private var optimisticPinned = false
-    @Volatile private var lastPinAttemptElapsed = 0L
-
-    private const val PIN_RETRY_COOLDOWN_MS = 5_000L
 
     // ------------------------------------------------------------------
     // Activity lifecycle wiring (called from MainActivity)
     // ------------------------------------------------------------------
 
     fun onActivityResumed(activity: Activity) {
-        activityRef = WeakReference(activity)
-        resumed = true
-        refreshPin()
+        com.maxleveldetox.overlay.SessionKiosk.onOwnAppResumed(activity)
     }
 
     fun onActivityPaused() {
-        resumed = false
-        optimisticPinned = false
+        // The next a11y foreground event (or the 30 s sweep) decides
+        // wall-vs-strips; nothing eager to do on pause.
     }
 
     fun onActivityDestroyed(activity: Activity) {
-        if (activityRef?.get() === activity) {
-            activityRef = null
-            resumed = false
-        }
+        // The kiosk windows live in the accessibility service process —
+        // an activity death never removes them.
     }
 
     // ------------------------------------------------------------------
-    // Desired-state computation (idempotent)
+    // Desired-state sync (idempotent, safe from any thread)
     // ------------------------------------------------------------------
 
-    /** True when persisted session state demands the kiosk trap:
-     *  DETOX + ACTIVE (not RECOVERY) + no live temp-unlock window. */
-    fun wanted(stateRepo: StateRepository): Boolean {
-        val session = stateRepo.blockingSession() ?: return false
-        if (session.status != SessionStatus.ACTIVE) return false
-        if (session.mode != SessionMode.DETOX) return false
-        val unlock = stateRepo.blockingTempUnlock()
-        val unlockLive = unlock.active && !unlock.isExpired(SystemClockNow.elapsed)
-        return !unlockLive
+    fun sync(stateRepo: StateRepository) {
+        com.maxleveldetox.overlay.SessionKiosk.sync(stateRepo.contextRef())
     }
-
-    fun sync(stateRepo: StateRepository) = setRequested(wanted(stateRepo))
 
     fun syncAsync(stateRepo: StateRepository) {
         scope.launch { sync(stateRepo) }
     }
 
     fun setRequested(want: Boolean) {
-        requested = want
-        if (want) refreshPin() else unpin()
-    }
-
-    // ------------------------------------------------------------------
-    // Actions
-    // ------------------------------------------------------------------
-
-    /** Lift the pin WITHOUT forgetting the request — used by the emergency
-     *  dialer and the alarm so system screens stay reachable. The trap
-     *  re-arms automatically when MainActivity resumes. */
-    fun unpinTemporarily() {
-        unpin()
-    }
-
-    private fun refreshPin() {
-        if (!requested || !resumed) return
-        val activity = activityRef?.get() ?: return
-        if (optimisticPinned) return
-        val now = SystemClockNow.elapsed
-        if (now - lastPinAttemptElapsed < PIN_RETRY_COOLDOWN_MS) return
-        lastPinAttemptElapsed = now
-        mainHandler.post {
-            try {
-                activity.startLockTask()
-                optimisticPinned = true
-            } catch (_: Exception) {
-                // Consent declined or OEM restriction — the accessibility
-                // snap-back still covers the launcher escape path.
-                optimisticPinned = false
-            }
-        }
-    }
-
-    private fun unpin() {
-        optimisticPinned = false
-        val activity = activityRef?.get() ?: return
-        mainHandler.post {
-            try {
-                activity.stopLockTask()
-            } catch (_: Exception) {
-                // Not pinned (or already unpinned) — nothing to do.
-            }
-        }
+        // v2.9 r17: kept for source compatibility — the desired state is
+        // always recomputed from persisted session state by SessionKiosk.
+        // Callers must use sync/syncAsync.
     }
 }

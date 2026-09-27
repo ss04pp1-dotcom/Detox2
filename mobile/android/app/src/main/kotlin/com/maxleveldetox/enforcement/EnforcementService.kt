@@ -114,6 +114,15 @@ class EnforcementService : Service() {
                     app.permissionMonitor.checkAndReact()
                 }
 
+                // v2.9 r17 — SESSION KIOSK self-healing heartbeat: re-assert
+                // the wall/strips against the CURRENT foreground (covers missed
+                // a11y events, emergency-lockdown auto-expiry, OEM window
+                // removals). SessionKiosk carries its own stand-down logic.
+                try {
+                    com.maxleveldetox.overlay.SessionKiosk.sync(this@EnforcementService)
+                } catch (_: Exception) {
+                }
+
                 // Guard evaluation every 4th sweep (~2 min) — the persisted
                 // JobScheduler guard covers the 15-min scale; this covers
                 // in-process flaps (Phase A2 dual coverage).

@@ -52,11 +52,30 @@ object EmergencyLockdown {
             .putBoolean(KEY_ACTIVE, true)
             .putLong(KEY_START, SystemClock.elapsedRealtime())
             .apply()
+        // v2.9 r17: the lockdown owns the screen from this instant — drop
+        // any SESSION KIOSK surfaces (wall/strips) immediately so the
+        // dialer is visible without waiting for the next a11y event.
+        // (One of the r16 "emergency exits, system fails" roots: while the
+        // old screen-pinning held MainActivity, the dialer launch itself
+        // was OS-blocked. Pinning is gone in r17; this hide closes the
+        // visual race the other way around.)
+        try {
+            com.maxleveldetox.overlay.SessionKiosk.hideAll(context)
+        } catch (_: Exception) {
+        }
         DiagLog.log("EMERGENCY_LOCKDOWN", "started")
     }
 
     fun end(context: Context) {
         prefs(context).edit().putBoolean(KEY_ACTIVE, false).apply()
+        // v2.9 r17: ending the emergency re-arms the session kiosk right
+        // away (wall over the launcher / strips over our own app) — the
+        // r16 hole was that nothing re-asserted enforcement after the
+        // lockdown ended, so the user could wander anywhere.
+        try {
+            com.maxleveldetox.overlay.SessionKiosk.sync(context)
+        } catch (_: Exception) {
+        }
         DiagLog.log("EMERGENCY_LOCKDOWN", "ended")
     }
 

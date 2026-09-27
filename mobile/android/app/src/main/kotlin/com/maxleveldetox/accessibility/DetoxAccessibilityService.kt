@@ -74,6 +74,11 @@ class DetoxAccessibilityService : AccessibilityService() {
         // gestures and shade swipes physically cannot reach SystemUI).
         EnforcementWall.bind(this)
 
+        // v2.9 r17: bind the SESSION KIOSK (total lockdown for Study/Detox —
+        // full-screen wall over the launcher + strips over our own / allowed
+        // apps; replaces the removed screen-pinning approach).
+        com.maxleveldetox.overlay.SessionKiosk.bind(this)
+
         // ENGINE HANDOFF (Phase A1): engine 1 is alive — if engine 2 was
         // covering a blackout, it will observe the fresh heartbeat and
         // yield on its own (ForegroundAppMonitorService.shouldYield).
@@ -197,6 +202,23 @@ class DetoxAccessibilityService : AccessibilityService() {
 
         val decision = app.policyEngine.evaluate(pkg)
         DiagLog.log("FG_EVENT", "$pkg -> $decision")
+
+        // ----------------------------------------------------------------
+        // v2.9 r17 — SESSION KIOSK (user-requested total lockdown): while
+        // a STUDY/DETOX session is ACTIVE every surface that is not our
+        // own app, a session-allowed study app, an input method, the
+        // dialer family or a real block decision gets the full-screen
+        // kiosk WALL — the launcher, Settings, unknown apps and the
+        // SystemUI shade/recents surfaces stop existing for the user.
+        // Home gestures, shade pulls and recents swipes land on OUR
+        // overlay and are consumed; BACK/APP_SWITCH/HOME keys are
+        // consumed in onKeyEvent. Returns true when walled (handled).
+        // ----------------------------------------------------------------
+        if (com.maxleveldetox.overlay.SessionKiosk.onForegroundEvent(
+                this, pkg, decision)
+        ) {
+            return
+        }
 
         when (decision) {
             PolicyDecision.BLOCK, PolicyDecision.CAGE_BLOCK, PolicyDecision.MONK_BLOCK -> {
@@ -648,13 +670,20 @@ class DetoxAccessibilityService : AccessibilityService() {
 
     override fun onKeyEvent(event: KeyEvent?): Boolean {
         event ?: return false
-        if (!EnforcementWall.isShowing()) return false
         // v2.5 r9.1: consume BOTH the DOWN and UP halves. Swallowing only
-        // DOWN lets an orphan UP reach the system. (This hook only runs at
-        // all now that the service XML declares canRequestFilterKeyEvents.)
+        // DOWN lets an orphan UP reach the system.
+        // v2.9 r17: the SESSION KIOSK surfaces extend the consumption —
+        // while the kiosk wall OR strips are up (Study/Detox lockdown),
+        // BACK / APP_SWITCH (recents) / HOME hardware keys are dead too
+        // (gesture-home/shade are already consumed by the overlay areas).
+        if (!EnforcementWall.isShowing() &&
+            !com.maxleveldetox.overlay.SessionKiosk.isWallShowing() &&
+            !com.maxleveldetox.overlay.SessionKiosk.isStripShowing()
+        ) return false
         return when (event.keyCode) {
             KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_APP_SWITCH,
+            KeyEvent.KEYCODE_HOME,
             -> true
             else -> false
         }
@@ -695,6 +724,7 @@ class DetoxAccessibilityService : AccessibilityService() {
         // v2.5 r9: the wall lives in our window — release it (the system
         // removes a11y overlay windows when the service dies anyway).
         EnforcementWall.unbind()
+        com.maxleveldetox.overlay.SessionKiosk.unbind()
         A11yOverlayController.hide(this)
         scope.cancel()
         super.onDestroy()

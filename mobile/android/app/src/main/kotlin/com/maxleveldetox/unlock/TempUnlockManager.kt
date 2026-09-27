@@ -89,8 +89,8 @@ class TempUnlockManager(
         // auto-reblock monitor can restore it if this process dies
         // mid-window (Social Sentry mechanism #17).
         AutoReblockMonitor.snapshotUnlockStart(stateRepo.contextRef())
-        // v2.5.5 audit fix M-3: a live temp-unlock window lifts the kiosk
-        // pin (safety outranks strictness during the paid window).
+        // v2.9 r17: a live temp-unlock window lifts the session kiosk
+        // surfaces (safety outranks strictness during the paid window).
         com.maxleveldetox.enforcement.KioskController.syncAsync(stateRepo)
         return Result(true, null, null)
     }
@@ -98,8 +98,8 @@ class TempUnlockManager(
     /** Clear the window (expiry, cage activation, session end). */
     suspend fun clear() {
         stateRepo.saveTempUnlock(TempUnlockSnapshot.INACTIVE)
-        // v2.5.5 audit fix M-3: a cleared temp-unlock re-arms the kiosk
-        // trap (the desired-state computation consults the window).
+        // v2.9 r17: a cleared temp-unlock re-arms the session kiosk
+        // surfaces (the armed-state computation consults the window).
         com.maxleveldetox.enforcement.KioskController.syncAsync(stateRepo)
     }
 

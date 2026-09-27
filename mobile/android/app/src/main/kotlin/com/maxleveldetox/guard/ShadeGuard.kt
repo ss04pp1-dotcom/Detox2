@@ -71,6 +71,9 @@ object ShadeGuard {
         val grace = app.stateRepo.blockingGraceWindow()
         if (grace != null && grace.expiresElapsed > SystemClockNow.elapsed) return false
         if (EnforcementWall.inEmergencyWindow()) return false
+        // v2.9 r17: the emergency LOCKDOWN owns the screen while it lasts
+        // (dialer only) — never collapse the shade over it.
+        if (com.maxleveldetox.safety.EmergencyLockdown.isActive(service)) return false
 
         // Throttle: Social-Sentry-grade response time.
         val now = SystemClockNow.elapsed
@@ -98,6 +101,12 @@ object ShadeGuard {
      */
     private fun enforcementSurfaceLive(app: MldApp): Boolean {
         if (EnforcementWall.isShowing()) return true
+        // v2.9 r17: the session kiosk wall/strips are live enforcement
+        // surfaces too (they also physically cover the shade area — this
+        // remains the second layer for OEM gaps).
+        if (com.maxleveldetox.overlay.SessionKiosk.isWallShowing() ||
+            com.maxleveldetox.overlay.SessionKiosk.isStripShowing()
+        ) return true
         return try {
             val session = app.stateRepo.blockingSession()
             if (session != null && session.status.isEnforcing) return true

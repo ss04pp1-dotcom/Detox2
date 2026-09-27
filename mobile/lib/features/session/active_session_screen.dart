@@ -96,7 +96,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     final tempUnlock = app.state.tempUnlock;
     final unlockActive = tempUnlock?.active == true;
 
-    return Scaffold(
+    // v2.9 r17 (user-requested total lockdown): BACK can never leave the
+    // session surface — the native kiosk strips + key filter already kill
+    // the hardware/gesture back outside the app; this seals the in-app
+    // side. Dismissal only happens via the legitimate end-of-session flow.
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       backgroundColor: isDetox ? const Color(0xFF160D18) : AppColors.background,
       body: SafeArea(
         child: Padding(
@@ -239,6 +245,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -414,7 +421,10 @@ class _BreakViewState extends State<_BreakView> {
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
-    return Scaffold(
+    // v2.9 r17: back cannot dismiss the study-break surface either.
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Padding(
@@ -470,6 +480,7 @@ class _BreakViewState extends State<_BreakView> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
