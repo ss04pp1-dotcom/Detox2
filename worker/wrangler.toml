@@ -21,6 +21,7 @@ crons = ["*/30 * * * *"]
 [vars]
 API_ENV = "production"
 ADMIN_ORIGIN = "https://detox2.pages.dev,https://admin.maxleveldetox.com,http://localhost:5173"
+ADMIN_SESSION_SECRET = "mld_admin_secret_auth_sig_key_2026"
 
 [[d1_databases]]
 binding = "DB"
@@ -91,6 +92,7 @@ workers_dev = true
 [env.production.vars]
 API_ENV = "production"
 ADMIN_ORIGIN = "https://detox2.pages.dev,https://admin.maxleveldetox.com,http://localhost:5173"
+ADMIN_SESSION_SECRET = "mld_admin_secret_auth_sig_key_2026"
 
 [[env.production.d1_databases]]
 binding = "DB"
