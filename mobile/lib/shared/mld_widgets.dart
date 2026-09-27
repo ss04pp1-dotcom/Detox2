@@ -1089,3 +1089,241 @@ class _MLDEmergencyBannerState extends State<MLDEmergencyBanner> {
     );
   }
 }
+
+/// MLDDurationPicker (v2.9 r16) — the advanced custom-duration dialog.
+///
+/// User-requested upgrades over the old "type total minutes" text field:
+///   * HOURS and MINUTES set SEPARATELY with big stepper controls,
+///   * start from ONE MINUTE (the old dialogs clamped to 10 / 30),
+///   * quick-pick chips for the common durations,
+///   * a live total readout ("1h 30m — 90 min") with range validation.
+///
+/// Returns the chosen duration in TOTAL MINUTES (or null when cancelled).
+class MLDDurationPicker {
+  MLDDurationPicker._();
+
+  /// `1h 30m`, `45m`, `90 min` style formatting for totals.
+  static String format(int minutes) {
+    if (minutes <= 0) return '0m';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h == 0) return '${m}m';
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
+  }
+
+  static Future<int?> show(
+    BuildContext context, {
+    required int minMinutes,
+    required int maxMinutes,
+    int initialMinutes = 30,
+  }) {
+    return showDialog<int>(
+      context: context,
+      builder: (context) => _MLDDurationPickerDialog(
+        minMinutes: minMinutes,
+        maxMinutes: maxMinutes,
+        initialMinutes: initialMinutes,
+      ),
+    );
+  }
+}
+
+class _MLDDurationPickerDialog extends StatefulWidget {
+  const _MLDDurationPickerDialog({
+    required this.minMinutes,
+    required this.maxMinutes,
+    required this.initialMinutes,
+  });
+
+  final int minMinutes;
+  final int maxMinutes;
+  final int initialMinutes;
+
+  @override
+  State<_MLDDurationPickerDialog> createState() => _MLDDurationPickerDialogState();
+}
+
+class _MLDDurationPickerDialogState extends State<_MLDDurationPickerDialog> {
+  late int _hours;
+  late int _minutes;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialMinutes.clamp(0, 24 * 60);
+    _hours = initial ~/ 60;
+    _minutes = initial % 60;
+  }
+
+  int get _total => _hours * 60 + _minutes;
+  bool get _valid =>
+      _total >= widget.minMinutes && _total <= widget.maxMinutes;
+
+  static const _quickPicks = <int>[1, 5, 10, 15, 30, 45, 60, 90, 120, 180];
+
+  void _setTotal(int minutes) => setState(() {
+        _hours = minutes ~/ 60;
+        _minutes = minutes % 60;
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHours = widget.maxMinutes ~/ 60;
+    return AlertDialog(
+      title: const Text('Custom duration'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _StepperColumn(
+                  label: 'HOURS',
+                  value: _hours,
+                  min: 0,
+                  max: maxHours,
+                  onChanged: (v) => setState(() => _hours = v),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: _StepperColumn(
+                  label: 'MINUTES',
+                  value: _minutes,
+                  min: 0,
+                  max: 59,
+                  onChanged: (v) => setState(() => _minutes = v),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          // Live total + range hint.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [
+                AppColors.primary.withValues(alpha: .12),
+                AppColors.surface,
+              ]),
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              border: Border.all(
+                color: _valid
+                    ? AppColors.primary.withValues(alpha: .3)
+                    : AppColors.warning.withValues(alpha: .5),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Total: ${MLDDurationPicker.format(_total)} ($_total min)',
+                  style: AppTypography.body(weight: FontWeight.w700),
+                ),
+                Icon(
+                  _valid ? Icons.check_circle_outline : Icons.error_outline,
+                  size: 18,
+                  color: _valid ? AppColors.success : AppColors.warning,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Allowed: ${MLDDurationPicker.format(widget.minMinutes)} – '
+            '${MLDDurationPicker.format(widget.maxMinutes)}',
+            style: AppTypography.caption(),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final q in _quickPicks)
+                if (q >= widget.minMinutes && q <= widget.maxMinutes)
+                  ActionChip(
+                    label: Text(MLDDurationPicker.format(q),
+                        style: AppTypography.caption()),
+                    onPressed: () => _setTotal(q),
+                  ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _valid ? () => Navigator.pop(context, _total) : null,
+          child: const Text('Set'),
+        ),
+      ],
+    );
+  }
+}
+
+/// One HOURS / MINUTES stepper column: big − / value / + controls.
+class _StepperColumn extends StatelessWidget {
+  const _StepperColumn({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [AppColors.surface, AppColors.elevated.withValues(alpha: .58)]),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(color: AppColors.edge),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: AppTypography.caption()),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                onPressed: value > min ? () => onChanged(value - 1) : null,
+                icon: const Icon(Icons.remove_circle_outline),
+                color: AppColors.primary,
+                iconSize: 28,
+              ),
+              SizedBox(
+                width: 42,
+                child: Text(
+                  '$value',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.heading().copyWith(
+                    fontSize: 24,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: value < max ? () => onChanged(value + 1) : null,
+                icon: const Icon(Icons.add_circle_outline),
+                color: AppColors.primary,
+                iconSize: 28,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

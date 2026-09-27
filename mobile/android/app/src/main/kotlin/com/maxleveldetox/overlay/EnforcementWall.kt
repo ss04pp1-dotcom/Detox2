@@ -393,18 +393,16 @@ object EnforcementWall {
     }
 
     private fun openDialer(service: AccessibilityService) {
-        emergencyUntilElapsed = SystemClockNow.elapsed + EMERGENCY_WINDOW_MS
-        // The wall must not cover the dialer (PRD §27) — it stands down
-        // for the 90 s emergency window; the detection loop re-arms the
-        // moment the user re-enters a blocked app afterwards.
+        // v2.9 r16 (user-reported bug): emergency from the wall now enters
+        // the DIALER-ONLY LOCKDOWN (EmergencyLockdown) — exactly like every
+        // other emergency surface. The legacy behavior here stood the wall
+        // down for 90 s and opened the dialer with NOTHING enforcing, which
+        // left the whole phone open mid-emergency. The lockdown keeps every
+        // enforcement surface armed and bounces anything that is not the
+        // dialer family straight back to the dialer.
+        com.maxleveldetox.safety.EmergencyLockdown.start(service)
         hideInternal()
-        try {
-            service.startActivity(
-                Intent(Intent.ACTION_DIAL, Uri.parse("tel:"))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        } catch (_: Exception) {
-        }
+        com.maxleveldetox.safety.EmergencyLockdown.openDialer(service)
     }
 
     /** Remove the wall (must run on the main thread). */
@@ -456,7 +454,11 @@ object EnforcementWall {
      *  isn't (tamper/OEM removal), bring it back for the given package. */
     fun reassert(service: AccessibilityService, pkg: String, hard: Boolean) {
         if (overlay != null) return
-        if (inEmergencyWindow()) return
+        // v2.9 r16: during the emergency lockdown the dialer owns the
+        // screen — the a11y bounce loop handles everything; re-asserting
+        // the wall here would cover the dialer.
+        if (inEmergencyWindow() ||
+            com.maxleveldetox.safety.EmergencyLockdown.isActive(service)) return
         val app = service.application as? MldApp ?: return
         val session = try {
             app.stateRepo.blockingSession()

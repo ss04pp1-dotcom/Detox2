@@ -44,6 +44,11 @@ object DetectionRules {
         val urlShapes: List<String> = emptyList(),
         val liteFeedViewIds: List<String> = emptyList(),
         val sharedFeedViewIds: List<String> = emptyList(),
+        /** v2.9 r16: activity-class-name hints (lowercased contains-match on
+         *  the WINDOW_STATE_CHANGED className — e.g. `shortsactivity`).
+         *  Activity names survive app UI redesigns that rename view ids,
+         *  so this is the most drift-resistant signal we have. */
+        val activityHints: List<String> = emptyList(),
     )
 
     /** Detection strategy shape — compiled in (rules swap signatures only). */
@@ -117,6 +122,10 @@ object DetectionRules {
             enabled = true,
             feedViewIds = listOf("reel_watch_fragment_root"),
             immersiveViewIds = listOf("pivot_bar"),
+            // v2.9 r16: Shorts is a dedicated activity in current YouTube
+            // builds (com.google.android.youtube.shorts.ShortsActivity) —
+            // the class name survives UI redesigns that rename view ids.
+            activityHints = listOf("shortsactivity"),
         ),
         "tiktok" to PlatformRule(enabled = true),
         "facebook" to PlatformRule(
@@ -126,17 +135,22 @@ object DetectionRules {
             navHints = listOf("Navigate to your Reels profile"),
             reelsHints = listOf("Reels"),
             fullscreenHints = listOf("Fullscreen"),
+            // v2.9 r16: the fullscreen reels player is its own activity —
+            // instant detection on window-state change, no tree walk.
+            activityHints = listOf("reelsactivity", "reelactivity"),
         ),
         "facebook_lite" to PlatformRule(
             enabled = true,
             feedViewIds = listOf("video_view"),
             immersiveGate = true,
+            activityHints = listOf("reelsactivity", "reelactivity"),
         ),
         "instagram" to PlatformRule(
             enabled = true,
             feedViewIds = listOf("root_clips_layout"),
             liteFeedViewIds = listOf("clips_viewer_video_container"),
             sharedFeedViewIds = listOf("reel_recycler"),
+            activityHints = listOf("clipsactivity"),
         ),
         "chrome" to PlatformRule(enabled = true, urlShapes = DEFAULT_URL_SHAPES),
         "chrome_beta" to PlatformRule(enabled = true, urlShapes = DEFAULT_URL_SHAPES),
@@ -249,6 +263,7 @@ object DetectionRules {
                     urlShapes = list("urlShapes", URL_SHAPE_RE),
                     liteFeedViewIds = list("liteFeedViewIds", VIEW_ID_RE),
                     sharedFeedViewIds = list("sharedFeedViewIds", VIEW_ID_RE),
+                    activityHints = list("activityHints", TEXT_HINT_RE),
                     immersiveGate = o.optBoolean("immersiveGate", false),
                 )
 
@@ -259,7 +274,8 @@ object DetectionRules {
                     rule.eventTextHints.isNotEmpty() || rule.reelDetailsHints.isNotEmpty() ||
                     rule.navHints.isNotEmpty() || rule.reelsHints.isNotEmpty() ||
                     rule.fullscreenHints.isNotEmpty() || rule.urlShapes.isNotEmpty() ||
-                    rule.liteFeedViewIds.isNotEmpty() || rule.sharedFeedViewIds.isNotEmpty()
+                    rule.liteFeedViewIds.isNotEmpty() || rule.sharedFeedViewIds.isNotEmpty() ||
+                    rule.activityHints.isNotEmpty()
                 if (shape != Shape.PACKAGE_GATE && !hasSignatures) return null
 
                 out[key] = rule

@@ -497,6 +497,32 @@ class NativeBridge {
   }
 
   // ---------------------------------------------------------------------
+  // v2.9 r16 — Uninstall Protection (device-admin shield)
+  // ---------------------------------------------------------------------
+
+  /// True while the device-admin uninstall shield is armed — Android itself
+  /// refuses the standard uninstall paths while it is active.
+  Future<bool> isUninstallProtectionActive() async {
+    final r = await call('getUninstallProtection');
+    if (!r.isOk) return false;
+    final data = r.data;
+    if (data is Map) return data['active'] == true;
+    return false;
+  }
+
+  /// Open the system device-admin activation dialog. The user confirms
+  /// there; poll [isUninstallProtectionActive] afterwards.
+  Future<void> requestUninstallProtection() async {
+    await call('requestUninstallProtection');
+  }
+
+  /// Remove our device admin (deactivate the shield). Returns when done;
+  /// check [isUninstallProtectionActive] for the resulting state.
+  Future<void> disableUninstallProtection() async {
+    await call('disableUninstallProtection');
+  }
+
+  // ---------------------------------------------------------------------
   // v2.1 Phase C — Progress layer (gamification)
   // ---------------------------------------------------------------------
 

@@ -1,6 +1,8 @@
 package com.maxleveldetox.guard
 
 import android.accessibilityservice.AccessibilityService
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -10,6 +12,7 @@ import com.maxleveldetox.MldApp
 import com.maxleveldetox.enforcement.LockController
 import com.maxleveldetox.enforcement.SessionStatus
 import com.maxleveldetox.enforcement.ViolationType
+import com.maxleveldetox.lock.MldDeviceAdminReceiver
 
 /**
  * UninstallInterceptor — screen-scrape interception of uninstall / force-
@@ -26,10 +29,13 @@ import com.maxleveldetox.enforcement.ViolationType
  *   3. after 2 interceptions in a row, show the blocking lock screen
  *      (UNAUTHORIZED_UNLOCK kind) — the user is walked back out.
  *
- * SECURITY BOUND: interception is ACTIVE ONLY while a session is enforcing
- * (PRD: the user's own device, their committed block window). Outside a
- * session the user may freely uninstall — that is their right, and forced
- * otherwise would be malware behavior (TRD §22 ethics note).
+ * SECURITY BOUND: interception is active while ANY enforcement surface is
+ * live — an enforcing session (original bound), the always-on surfaces
+ * (schedules / app limits), monk mode, a lock-my-phone session, OR the
+ * v2.9 user-facing Uninstall Protection toggle (device admin armed).
+ * With NOTHING armed the user may freely uninstall — that is their
+ * right, and forced otherwise would be malware behavior (TRD §22 ethics
+ * note).
  *
  * Node scanning is strictly bounded (max depth 3, max 40 nodes) to keep the
  * a11y hot path cheap.
@@ -121,9 +127,14 @@ object UninstallInterceptor {
         ) return false
 
         val app = service.application as? MldApp ?: return false
+        // v2.9 r16 (user-reported: "uninstall protection never works"):
+        // the old bound required an ENFORCING SESSION, so with only
+        // schedules / app limits / monk / lock-my-phone / the uninstall
+        // shield armed, the scraper stood down completely. Interception is
+        // now active while ANY enforcement surface is live.
         val session = app.stateRepo.blockingSession()
-        // ETHICS BOUND: only during an enforcing session.
-        if (session == null || !session.status.isEnforcing) return false
+        val sessionEnforcing = session != null && session.status.isEnforcing
+        if (!sessionEnforcing && !anyOtherSurfaceLive(service)) return false
 
         // Never fight the user's own permission-recovery / restore window
         // (same rule ShadeGuard follows).
@@ -139,7 +150,7 @@ object UninstallInterceptor {
         // 1) Cheap path: the event's own text (window title etc.).
         var text = collectText(event)
         if (mentionsSelf(text) && mentionsKeyword(text)) {
-            intercept(service, session.id, pkg)
+            intercept(service, session?.id ?: "always_on", pkg)
             return true
         }
 
@@ -150,8 +161,32 @@ object UninstallInterceptor {
         text = "$text $scanned"
         if (!mentionsSelf(text) || !mentionsKeyword(text)) return false
 
-        intercept(service, session.id, pkg)
+        intercept(service, session?.id ?: "always_on", pkg)
         return true
+    }
+
+    /** True when any non-session enforcement surface is live — always-on
+     *  schedules/app limits, monk mode, lock-my-phone, or the device-admin
+     *  uninstall shield (v2.9 r16). */
+    private fun anyOtherSurfaceLive(context: Context): Boolean {
+        // Device admin armed = the user turned Uninstall Protection on —
+        // Android itself blocks the standard uninstall paths while it is
+        // active; the scraper adds the settings-side shield (including
+        // attempts to DEACTIVATE the admin).
+        if (isUninstallShieldArmed(context)) return true
+        if (com.maxleveldetox.enforcement.AlwaysOnRules.exist(context)) return true
+        if (com.maxleveldetox.monk.MonkModeManager.isActive(context)) return true
+        if (com.maxleveldetox.lock.LockMyPhoneController.isSessionActive(context)) return true
+        return false
+    }
+
+    /** The v2.9 uninstall shield: our force-lock device admin is active.
+     *  Public for NativeBridge's settings toggle status read. */
+    fun isUninstallShieldArmed(context: Context): Boolean = try {
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        dpm.isAdminActive(ComponentName(context, MldDeviceAdminReceiver::class.java))
+    } catch (_: Exception) {
+        false
     }
 
     /** Lower-cased text of the active window when it belongs to [pkg];

@@ -425,7 +425,12 @@ class LockScreenActivity : Activity() {
         override fun run() {
             if (intentionallyDone || isFinishing) return
             // Emergency window (dialer open) — never cover a real call.
-            if (SystemClockNow.elapsed < emergencyUntilElapsed) {
+            // v2.9 r16: same stand-down while the emergency LOCKDOWN is
+            // live — the dialer owns the screen and the a11y bounce loop
+            // enforces everything else.
+            if (SystemClockNow.elapsed < emergencyUntilElapsed ||
+                com.maxleveldetox.safety.EmergencyLockdown.isActive(this@LockScreenActivity)
+            ) {
                 handler.postDelayed(this, REASSERT_MS)
                 return
             }
@@ -507,13 +512,21 @@ class LockScreenActivity : Activity() {
     }
 
     private fun openDialer() {
-        // PRD §27: emergency is always reachable — the trap stands down
-        // for long enough to place a real call, then re-arms.
-        emergencyUntilElapsed = SystemClockNow.elapsed + EMERGENCY_WINDOW_MS
+        // v2.9 r16 (user-reported bug): emergency from the lock surface now
+        // enters the DIALER-ONLY LOCKDOWN — same as every other emergency
+        // surface. The legacy behavior stood this trap down for 90 s and
+        // opened a bare dialer with NOTHING enforcing, leaving the whole
+        // phone open mid-emergency. The lockdown keeps the session armed
+        // and bounces everything that is not the dialer family.
+        com.maxleveldetox.safety.EmergencyLockdown.start(this)
         try {
-            startActivity(Intent(Intent.ACTION_DIAL)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            com.maxleveldetox.safety.EmergencyLockdown.openDialer(this)
         } catch (_: Exception) { /* dialer missing is an OS-level concern */ }
+        // The lockdown owns the screen; the trap must not sit on top of
+        // the dialer re-asserting itself.
+        intentionallyDone = true
+        handler.removeCallbacks(reassertRunnable)
+        finish()
     }
 
     enum class LockControllerKind { BLOCKED_APP, WARNING, CAGE }

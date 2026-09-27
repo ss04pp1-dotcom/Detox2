@@ -61,6 +61,10 @@ export interface PlatformRules {
   liteFeedViewIds?: string[];
   /** Package-agnostic ids matched without the package prefix (reel_recycler). */
   sharedFeedViewIds?: string[];
+  /** v2.9 r16: activity-class-name hints (lowercased contains-match on the
+   *  WINDOW_STATE_CHANGED className, e.g. `shortsactivity`) — the most
+   *  drift-resistant shorts signal (activity names survive UI redesigns). */
+  activityHints?: string[];
 }
 
 export interface DetectionRulesDoc {
@@ -128,6 +132,7 @@ export const DEFAULT_DETECTION_RULES: DetectionRulesDoc = {
       enabled: true,
       feedViewIds: ['reel_watch_fragment_root'],
       immersiveViewIds: ['pivot_bar'],
+      activityHints: ['shortsactivity'],
     },
     // Package gate — the whole app IS the feed; applies to both the global
     // and the regional TikTok package.
@@ -139,11 +144,13 @@ export const DEFAULT_DETECTION_RULES: DetectionRulesDoc = {
       navHints: ['Navigate to your Reels profile'],
       reelsHints: ['Reels'],
       fullscreenHints: ['Fullscreen'],
+      activityHints: ['reelsactivity', 'reelactivity'],
     },
     facebook_lite: {
       enabled: true,
       feedViewIds: ['video_view'],
       immersiveGate: true,
+      activityHints: ['reelsactivity', 'reelactivity'],
     },
     // One signature set for BOTH Instagram packages (full + lite), exactly
     // like the compiled detector's shared strategy.
@@ -152,6 +159,7 @@ export const DEFAULT_DETECTION_RULES: DetectionRulesDoc = {
       feedViewIds: ['root_clips_layout'],
       liteFeedViewIds: ['clips_viewer_video_container'],
       sharedFeedViewIds: ['reel_recycler'],
+      activityHints: ['clipsactivity'],
     },
     chrome: { enabled: true, urlShapes: [...SHORTS_URL_SHAPES] },
     chrome_beta: { enabled: true, urlShapes: [...SHORTS_URL_SHAPES] },
@@ -182,6 +190,7 @@ const TEXT_LISTS: readonly ListSpec[] = [
   { key: 'navHints', re: TEXT_HINT_RE },
   { key: 'reelsHints', re: TEXT_HINT_RE },
   { key: 'fullscreenHints', re: TEXT_HINT_RE },
+  { key: 'activityHints', re: TEXT_HINT_RE, lowercase: true },
 ];
 
 const URL_LISTS: readonly ListSpec[] = [

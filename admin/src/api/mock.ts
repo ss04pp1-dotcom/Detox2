@@ -307,7 +307,7 @@ const DETECTION_DEFAULTS_MOCK: DetectionRulesDoc = {
   schemaVersion: 1,
   minAppVersion: '1.0.0',
   platforms: {
-    youtube: { enabled: true, feedViewIds: ['reel_watch_fragment_root'], immersiveViewIds: ['pivot_bar'] },
+    youtube: { enabled: true, feedViewIds: ['reel_watch_fragment_root'], immersiveViewIds: ['pivot_bar'], activityHints: ['shortsactivity'] },
     tiktok: { enabled: true },
     facebook: {
       enabled: true,
@@ -316,9 +316,10 @@ const DETECTION_DEFAULTS_MOCK: DetectionRulesDoc = {
       navHints: ['Navigate to your Reels profile'],
       reelsHints: ['Reels'],
       fullscreenHints: ['Fullscreen'],
+      activityHints: ['reelsactivity', 'reelactivity'],
     },
-    facebook_lite: { enabled: true, feedViewIds: ['video_view'], immersiveGate: true },
-    instagram: { enabled: true, feedViewIds: ['root_clips_layout'], liteFeedViewIds: ['clips_viewer_video_container'], sharedFeedViewIds: ['reel_recycler'] },
+    facebook_lite: { enabled: true, feedViewIds: ['video_view'], immersiveGate: true, activityHints: ['reelsactivity', 'reelactivity'] },
+    instagram: { enabled: true, feedViewIds: ['root_clips_layout'], liteFeedViewIds: ['clips_viewer_video_container'], sharedFeedViewIds: ['reel_recycler'], activityHints: ['clipsactivity'] },
     chrome: { enabled: true, urlShapes: ['youtube.com/shorts', 'facebook.com/reel/', 'instagram.com/reel/'] },
     chrome_beta: { enabled: true, urlShapes: ['youtube.com/shorts', 'facebook.com/reel/', 'instagram.com/reel/'] },
   },

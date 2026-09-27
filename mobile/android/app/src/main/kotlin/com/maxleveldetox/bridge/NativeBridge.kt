@@ -1291,6 +1291,57 @@ class NativeBridge(private val context: Context) : MethodChannel.MethodCallHandl
                 )
 
                 // -----------------------------------------------------
+                // v2.9 r16 — Uninstall Protection (device-admin shield)
+                // -----------------------------------------------------
+                // While our force-lock device admin is active, Android
+                // itself refuses the standard uninstall paths (launcher
+                // drag, Play Store, Settings App Info). The a11y scraper
+                // (UninstallInterceptor) adds the settings-side shield —
+                // including attempts to deactivate the admin.
+                "getUninstallProtection" -> ok(org.json.JSONObject().apply {
+                    put("active", com.maxleveldetox.guard.UninstallInterceptor
+                        .isUninstallShieldArmed(context))
+                })
+                "requestUninstallProtection" -> {
+                    val opened = try {
+                        val dpm = context.getSystemService(android.content.Context.DEVICE_POLICY_SERVICE)
+                            as android.app.admin.DevicePolicyManager
+                        val admin = android.content.ComponentName(
+                            context, com.maxleveldetox.lock.MldDeviceAdminReceiver::class.java)
+                        context.startActivity(
+                            android.content.Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                                putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                                putExtra(
+                                    android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                                    "Turn this on so MAXLEVEL DETOX cannot be uninstalled " +
+                                        "while your blocking rules are active.",
+                                )
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                        )
+                        !dpm.isAdminActive(admin) // true = dialog is showing (not yet active)
+                    } catch (_: Exception) {
+                        false
+                    }
+                    ok(org.json.JSONObject().apply { put("requested", opened) })
+                }
+                "disableUninstallProtection" -> {
+                    val removed = try {
+                        val dpm = context.getSystemService(android.content.Context.DEVICE_POLICY_SERVICE)
+                            as android.app.admin.DevicePolicyManager
+                        val admin = android.content.ComponentName(
+                            context, com.maxleveldetox.lock.MldDeviceAdminReceiver::class.java)
+                        if (dpm.isAdminActive(admin)) {
+                            dpm.removeActiveAdmin(admin)
+                        }
+                        true
+                    } catch (_: Exception) {
+                        false
+                    }
+                    ok(org.json.JSONObject().apply { put("removed", removed) })
+                }
+
+                // -----------------------------------------------------
                 // Debug-only tools — IMPOSSIBLE in release builds.
                 // -----------------------------------------------------
                 "debugFastForward", "debugSimulateShorts", "debugResetData",

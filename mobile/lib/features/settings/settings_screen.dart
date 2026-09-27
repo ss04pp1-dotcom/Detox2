@@ -32,10 +32,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _notifGranted = false;
   bool _notifEnabled = true;
 
+  // v2.9 r16 — uninstall shield (device admin) status.
+  bool _shieldActive = false;
+
   @override
   void initState() {
     super.initState();
     _loadNotificationGuard();
+    _loadUninstallShield();
   }
 
   Future<void> _loadNotificationGuard() async {
@@ -50,6 +54,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _toggleNotificationGuard(bool value) async {
     await NativeBridge.instance.setNotificationGuardEnabled(value);
     _loadNotificationGuard();
+  }
+
+  Future<void> _loadUninstallShield() async {
+    final active = await NativeBridge.instance.isUninstallProtectionActive();
+    if (!mounted) return;
+    setState(() => _shieldActive = active);
+  }
+
+  Future<void> _toggleUninstallShield(bool value) async {
+    if (value) {
+      // Opens the system device-admin dialog; the user confirms there.
+      // Re-check the resulting state when they come back.
+      await NativeBridge.instance.requestUninstallProtection();
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Turn off Uninstall Protection?'),
+          content: const Text(
+              'MAXLEVEL DETOX can then be uninstalled the normal way again. '
+              'Blocking rules themselves stay active.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Turn off')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      await NativeBridge.instance.disableUninstallProtection();
+    }
+    await _loadUninstallShield();
   }
 
   @override
@@ -154,6 +193,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _section(context, 'NOTIFICATIONS', [
             _notificationGuardItem(),
           ]),
+          // v2.9 r16 — SECURITY section: the uninstall shield card.
+          _section(context, 'SECURITY', [
+            _uninstallShieldItem(),
+          ]),
           _section(context, 'SUPPORT', [
             _item(Icons.workspace_premium_outlined, 'MAXLEVEL PRO',
                 'Support the app — safety stays free',
@@ -244,6 +287,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// v2.9 r16 — Uninstall Protection row: device-admin shield status +
+  /// toggle. While armed, Android itself refuses the standard uninstall
+  /// paths (launcher drag, Play Store, Settings App Info) and the a11y
+  /// scraper walks the user out of any uninstall / force-stop / admin-
+  /// deactivate screen while rules are live.
+  Widget _uninstallShieldItem() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _shieldActive ? Icons.gpp_good : Icons.gpp_bad_outlined,
+                color: _shieldActive ? AppColors.success : AppColors.textSecondary,
+                size: 22,
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Uninstall Protection',
+                        style: AppTypography.body(weight: FontWeight.w600)),
+                    Text(
+                      _shieldActive
+                          ? 'Device admin armed — the app cannot be uninstalled'
+                          : 'Off — turn on to block uninstall while rules are active',
+                      style: AppTypography.caption(),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(value: _shieldActive, onChanged: _toggleUninstallShield),
+            ],
+          ),
+          Text(
+            'While any blocking rule, schedule, Monk Mode, Lock-My-Phone or a '
+            'session is active, uninstall and force-stop screens are blocked '
+            'and the OS refuses uninstalling this app.',
+            style: AppTypography.caption().copyWith(height: 1.4),
+          ),
         ],
       ),
     );

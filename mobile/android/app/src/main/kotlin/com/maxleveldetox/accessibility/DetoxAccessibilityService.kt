@@ -117,7 +117,15 @@ class DetoxAccessibilityService : AccessibilityService() {
         if (com.maxleveldetox.guard.DnsTamperDetector.maybeIntercept(this, event)) return
 
         when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> handleForeground(pkg)
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                handleForeground(pkg)
+                // v2.9 r16: window-state carries the ACTIVITY class name —
+                // the cheapest, most drift-resistant reels signal (YouTube
+                // Shorts / FB Reels players are dedicated activities). Also
+                // arms the scheduled re-scans below.
+                maybeActivityReels(pkg, event)
+                scheduleReelsRescans(pkg)
+            }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> handleContent(pkg, event)
         }
     }
@@ -155,14 +163,24 @@ class DetoxAccessibilityService : AccessibilityService() {
                 ).show()
             } catch (_: Exception) {
             }
-            app.violationManager.record(
-                sessionId = "emergency",
-                pkg = pkg,
-                type = ViolationType.BLOCKED_APP,
-                severity = "LOW",
-                warningNumber = 0,
-                action = "emergency_lockdown",
-            )
+            // v2.9 r16: the bounce loop can fire several times a second —
+            // record at most one violation per app per throttle window so
+            // the DataStore write path is not hammered.
+            val recNow = android.os.SystemClock.elapsedRealtime()
+            synchronized(lastHandled) {
+                val lastRec = lastHandled["emrec:$pkg"] ?: 0L
+                if (recNow - lastRec >= EMERGENCY_RECORD_THROTTLE_MS) {
+                    lastHandled["emrec:$pkg"] = recNow
+                    app.violationManager.record(
+                        sessionId = "emergency",
+                        pkg = pkg,
+                        type = ViolationType.BLOCKED_APP,
+                        severity = "LOW",
+                        warningNumber = 0,
+                        action = "emergency_lockdown",
+                    )
+                }
+            }
             return
         }
 
@@ -386,7 +404,122 @@ class DetoxAccessibilityService : AccessibilityService() {
             ?: return
 
         lastReelsSignal = now
+        interceptReelsDetected(app, pkg, detection.strategy, manager)
+    }
 
+    /**
+     * v2.9 r16 — WINDOW_STATE_CHANGED reels check. The activity class name
+     * (e.g. com.google.android.youtube.shorts.ShortsActivity) is matched
+     * against the platform's activityHints — instant, no tree walk, and
+     * immune to view-id drift. Falls back to a full detect() when the
+     * class name carries no hints (cheap — resolve() already ran).
+     */
+    private fun maybeActivityReels(pkg: String, event: AccessibilityEvent) {
+        if (pkg !in ReelsDetector.SUPPORTED_PACKAGES) return
+        val app = application as? MldApp ?: return
+        val shorts = try {
+            app.stateRepo.blockingShorts()
+        } catch (_: Exception) {
+            return
+        }
+        if (!shorts.enabled) return
+        if (pkg !in shorts.platforms.filterValues { it }.keys) return
+        val manager = app.reelsEscalation
+        if (manager.isUnblocked(pkg)) return
+        if (app.breakPasses.isBreakActive(pkg)) return
+
+        val detection = reelsDetector.detectActivity(pkg, event.className?.toString())
+            ?: return
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastReelsSignal < REELS_DEBOUNCE_MS) return
+        lastReelsSignal = now
+
+        DiagLog.log("REELS_ACTIVITY", "$pkg ${event.className} -> ${detection.strategy}")
+        val session = try {
+            app.stateRepo.blockingSession()
+        } catch (_: Exception) {
+            null
+        }
+        val sessionEnforcing = session != null && session.status.isEnforcing
+        if (sessionEnforcing && pkg in ShortsState_DEFAULT_PLATFORMS_KEYS) {
+            // In-session ladder — same shape as handleContentSession.
+            if (!ReelsRedirect.navigateFromService(this, pkg)) {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+            }
+            app.violationManager.shortsAttempt(
+                pkg = pkg,
+                warningLimit = app.runtimeConfig.current().shortsWarningCount,
+                onWarning = { count, limit ->
+                    LockController.warning(this, count, limit)
+                },
+                onCage = {
+                    scope.launch { app.sessionEngine.activateCage() }
+                    LockController.cage(this)
+                },
+            )
+        } else {
+            interceptReelsDetected(app, pkg, detection.strategy, manager)
+        }
+    }
+
+    /**
+     * v2.9 r16 — scheduled re-scans after entering a monitored app. The
+     * shorts/reels UI inflates AFTER the window-state event; content-change
+     * events can be throttled or batched by the system. Three delayed
+     * scans (+500/+1500/+3000 ms) close the gap — and they double as the
+     * closed-loop verification for ReelsRedirect (a redirect that did not
+     * stick re-detects and advances the redirect ladder's next rung).
+     */
+    private fun scheduleReelsRescans(pkg: String) {
+        if (pkg !in ReelsDetector.SUPPORTED_PACKAGES) return
+        for (delay in RESCAN_DELAYS_MS) {
+            scope.launch {
+                kotlinx.coroutines.delay(delay)
+                try {
+                    reelsRescan(pkg)
+                } catch (_: Exception) {
+                    // service may be gone by then — fine
+                }
+            }
+        }
+    }
+
+    private fun reelsRescan(pkg: String) {
+        if (pkg !in ReelsDetector.SUPPORTED_PACKAGES) return
+        val app = application as? MldApp ?: return
+        val shorts = try {
+            app.stateRepo.blockingShorts()
+        } catch (_: Exception) {
+            return
+        }
+        if (!shorts.enabled) return
+        if (pkg !in shorts.platforms.filterValues { it }.keys) return
+        val manager = app.reelsEscalation
+        if (manager.isUnblocked(pkg)) return
+        if (app.breakPasses.isBreakActive(pkg)) return
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        // The re-scan is the closed-loop verifier: it honours the short
+        // debounce (so one redirect is not double-counted instantly) but
+        // NOT the longer in-session cooldown — a redirect that did not
+        // stick must advance the ladder promptly.
+        if (now - lastReelsSignal < REELS_DEBOUNCE_MS) return
+
+        val detection = reelsDetector.detect(pkg, null, activeRootFor(pkg)) ?: return
+        lastReelsSignal = now
+        DiagLog.log("REELS_RESCAN", "$pkg -> ${detection.strategy}")
+        interceptReelsDetected(app, pkg, detection.strategy, manager)
+    }
+
+    /** Shared out-of-session interception: redirect ladder + escalation
+     *  surface (toast -> soft overlay -> hard lockout). */
+    private fun interceptReelsDetected(
+        app: MldApp,
+        pkg: String,
+        strategy: String,
+        manager: ReelsEscalationManager,
+    ) {
         // v2.7 r13 (user-requested): stay INSIDE the app — navigate to its
         // safe surface (YouTube Home / FB Feed / IG Feed) instead of
         // kicking the user out to the launcher. HOME is the fallback only.
@@ -394,7 +527,7 @@ class DetoxAccessibilityService : AccessibilityService() {
             performGlobalAction(GLOBAL_ACTION_HOME)
         }
 
-        manager.onDetection(pkg, detection.strategy) { esc ->
+        manager.onDetection(pkg, strategy) { esc ->
             when (esc.step) {
                 ReelsEscalationManager.Step.TOAST -> {
                     try {
@@ -450,10 +583,21 @@ class DetoxAccessibilityService : AccessibilityService() {
      * content-change event can arrive from a package whose window is not the
      * active one (overlay, IME, split-screen); scanning the wrong tree would
      * let the detector's partial-id fallback match another app's views.
+     *
+     * v2.9 r16: when the active window belongs to another package, fall
+     * back to the window list (FLAG_RETRIEVE_INTERACTIVE_WINDOWS is set):
+     * shorts/reels sometimes render in a layer that is not the
+     * "active" window (player overlays, split top). Without this the
+     * scan silently returned null — the classic mid-scroll miss.
      */
     private fun activeRootFor(pkg: String): android.view.accessibility.AccessibilityNodeInfo? {
         val root = rootInActiveWindow ?: return null
-        return if (root.packageName?.toString() == pkg) root else null
+        if (root.packageName?.toString() == pkg) return root
+        return try {
+            windows.firstOrNull { it.root?.packageName?.toString() == pkg }?.root
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /** In-session ladder: warnings -> cage (Phase 1 behavior, r9.1 detector). */
@@ -560,8 +704,17 @@ class DetoxAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val FG_THROTTLE_MS = 800L
-        private const val SHORTS_COOLDOWN_MS = 10_000L
+        private const val SHORTS_COOLDOWN_MS = 6_000L
         private const val REELS_DEBOUNCE_MS = 500L
+
+        /** v2.9 r16: delayed re-scan schedule after entering a monitored
+         *  app — covers late-inflating shorts UI and verifies redirects. */
+        private val RESCAN_DELAYS_MS = longArrayOf(500L, 1500L, 3000L)
+
+        /** v2.9 r16: emergency-bounce violation recording throttle (the
+         *  bounce loop can fire many times a second — one record per app
+         *  per window is plenty). */
+        private const val EMERGENCY_RECORD_THROTTLE_MS = 5_000L
 
         /** v2.5 r9.1: min gap between content scans of the same package. */
         private const val CONTENT_SCAN_THROTTLE_MS = 300L

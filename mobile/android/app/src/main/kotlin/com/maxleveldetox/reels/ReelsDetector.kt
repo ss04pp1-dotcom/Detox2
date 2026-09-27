@@ -46,7 +46,7 @@ class ReelsDetector {
 
     fun detect(
         pkg: String,
-        event: AccessibilityEvent,
+        event: AccessibilityEvent?,
         rootNode: AccessibilityNodeInfo?,
     ): Detection? {
         val resolved = DetectionRules.resolve(pkg) ?: return null
@@ -56,6 +56,26 @@ class ReelsDetector {
             Shape.TEXT_BFS -> detectByTextBfs(event, rootNode, resolved)
             Shape.URL -> detectByUrl(pkg, rootNode, resolved)
         }
+    }
+
+    /**
+     * v2.9 r16 — ACTIVITY-NAME detection: the WINDOW_STATE_CHANGED event's
+     * className (e.g. `com.google.android.youtube.shorts.ShortsActivity`)
+     * matched against the platform's activityHints (lowercased contains).
+     *
+     * This is the cheapest and most drift-resistant strategy: no node tree
+     * walk at all, and activity class names survive the UI redesigns that
+     * rename view ids (the classic YouTube miss vector). Returns null when
+     * the platform has no hints configured or nothing matches.
+     */
+    fun detectActivity(pkg: String, className: String?): Detection? {
+        if (className.isNullOrBlank()) return null
+        val resolved = DetectionRules.resolve(pkg) ?: return null
+        if (resolved.rule.activityHints.isEmpty()) return null
+        val cls = className.lowercase()
+        val hint = resolved.rule.activityHints.firstOrNull { cls.contains(it.lowercase()) }
+            ?: return null
+        return Detection(Surface.FEED, "${resolved.platformKey}_activity:$hint")
     }
 
     // -----------------------------------------------------------------
@@ -107,7 +127,7 @@ class ReelsDetector {
     // -----------------------------------------------------------------
 
     private fun detectByTextBfs(
-        event: AccessibilityEvent,
+        event: AccessibilityEvent?,
         root: AccessibilityNodeInfo?,
         resolved: DetectionRules.Resolved,
     ): Detection? {
@@ -115,9 +135,13 @@ class ReelsDetector {
 
         // Cheap pre-check on event text first (avoids the BFS entirely for
         // the common case where the event carries the "Reel details" label).
-        val eventText = event.text?.joinToString(separator = " ") { it?.toString() ?: "" } ?: ""
-        if (rule.eventTextHints.any { eventText.contains(it) }) {
-            return Detection(Surface.FEED, "fb_reel_details_text")
+        // v2.9 r16: event is nullable — scheduled re-scans have no event.
+        if (event != null) {
+            val eventText =
+                event.text?.joinToString(separator = " ") { it?.toString() ?: "" } ?: ""
+            if (rule.eventTextHints.any { eventText.contains(it) }) {
+                return Detection(Surface.FEED, "fb_reel_details_text")
+            }
         }
 
         if (root == null) return null

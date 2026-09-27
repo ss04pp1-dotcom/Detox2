@@ -280,6 +280,9 @@ export interface PlatformRules {
   urlShapes?: string[];
   liteFeedViewIds?: string[];
   sharedFeedViewIds?: string[];
+  /** v2.9 r16: activity-class-name hints (lowercased contains-match, e.g.
+   *  `shortsactivity`) — drift-resistant WINDOW_STATE_CHANGED signal. */
+  activityHints?: string[];
 }
 
 export interface DetectionRulesDoc {
@@ -362,6 +365,12 @@ export const DETECTION_LIST_FIELDS: Array<{
     label: 'Fullscreen hints',
     hint: 'BFS content descriptions (contains).',
     platforms: ['facebook'],
+  },
+  {
+    key: 'activityHints',
+    label: 'Activity-name hints',
+    hint: 'Lowercased contains-match on the window-state activity class (e.g. shortsactivity) — most drift-resistant.',
+    platforms: ['youtube', 'facebook', 'facebook_lite', 'instagram'],
   },
   {
     key: 'urlShapes',

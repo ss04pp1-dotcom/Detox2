@@ -250,8 +250,15 @@ class _StudySetupScreenState extends State<StudySetupScreen> {
                 label: 'Custom',
                 selected: !_durations.contains(_duration),
                 onTap: () async {
-                  final minutes = await _askCustomDuration(context);
-                  if (minutes != null && minutes >= 10 && minutes <= 480) {
+                  // v2.9 r16: advanced duration picker — H/M steppers,
+                  // from ONE minute up to the study ceiling (8 h).
+                  final minutes = await MLDDurationPicker.show(
+                    context,
+                    minMinutes: 1,
+                    maxMinutes: 480,
+                    initialMinutes: _duration.clamp(1, 480),
+                  );
+                  if (minutes != null && mounted) {
                     setState(() => _duration = minutes);
                   }
                 },
@@ -431,29 +438,6 @@ class _StudySetupScreenState extends State<StudySetupScreen> {
       ),
     );
   }
-
-  Future<int?> _askCustomDuration(BuildContext context) {
-    final controller = TextEditingController(text: '$_duration');
-    return showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Custom duration (minutes)'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: '10 – 480'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, int.tryParse(controller.text)),
-            child: const Text('Set'),
-          ),
-        ],
-      ),
-    ).whenComplete(controller.dispose); // v2.5.5 audit fix: leak
-  }
 }
 
 /// Detox setup (UI/UX §17) — more serious, strictness selector, then a
@@ -588,8 +572,15 @@ class _DetoxSetupScreenState extends State<DetoxSetupScreen> {
     final selected = !_durations.contains(_duration);
     return GestureDetector(
       onTap: () async {
-        final minutes = await _askCustomDuration(context);
-        if (minutes != null && minutes >= 30 && minutes <= 1440) {
+        // v2.9 r16: advanced duration picker — H/M steppers, from ONE
+        // minute up to the detox ceiling (24 h).
+        final minutes = await MLDDurationPicker.show(
+          context,
+          minMinutes: 1,
+          maxMinutes: 1440,
+          initialMinutes: _duration.clamp(1, 1440),
+        );
+        if (minutes != null && mounted) {
           setState(() => _duration = minutes);
         }
       },
@@ -648,29 +639,6 @@ class _DetoxSetupScreenState extends State<DetoxSetupScreen> {
         ),
       ),
     );
-  }
-
-  Future<int?> _askCustomDuration(BuildContext context) {
-    final controller = TextEditingController(text: '$_duration');
-    return showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Custom duration (minutes)'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: '30 – 1440'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, int.tryParse(controller.text)),
-            child: const Text('Set'),
-          ),
-        ],
-      ),
-    ).whenComplete(controller.dispose); // v2.5.5 audit fix: leak
   }
 }
 

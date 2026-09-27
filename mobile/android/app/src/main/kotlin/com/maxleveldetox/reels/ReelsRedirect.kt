@@ -14,24 +14,58 @@ import com.maxleveldetox.accessibility.DiagLog
  * Feed). The old GLOBAL_ACTION_HOME kick-out becomes the last-resort
  * fallback only.
  *
- * Ladder (per platform, first success wins):
- *   1. NODE CLICK — find the app's own bottom-nav "Home" tab in the active
- *      window tree and click it. The most native navigation possible: the
- *      app just switches tabs. No activity launch, no exit, no jank.
- *   2. ROOT REVISIT — launch the app's own launcher intent with
- *      CLEAR_TOP|SINGLE_TOP. The app's root activity (YouTube Home, FB
- *      News Feed, IG Feed) comes forward and everything stacked above it
- *      in its task (the shorts activity) is finished. Same app, same task
- *      — the user never lands on the launcher.
- *   3. HOME — the old kick-out. Only when both fail, or for platforms
- *      with NO safe in-app surface (TikTok: the whole app IS the feed;
- *      Chrome: a shorts URL is just a tab — the site is the problem).
+ * Ladder (v2.9 r16 — closed-loop, per platform, one rung per detection):
+ *   0. RUNG 1 — BACK PRESS: immersive reels/shorts players (Facebook
+ *      Reels, YouTube Shorts, Instagram Reels) are fullscreen surfaces ON
+ *      TOP of the app's own feed/home — Android's BACK closes the player
+ *      and lands on the feed. This is the most reliable in-app redirect
+ *      (it is exactly what a manual user does) and needs no tree walk.
+ *   1. RUNG 2 — NODE CLICK — find the app's own bottom-nav "Home" tab in
+ *      the active window tree and click it (partial-player states where
+ *      the nav bar is still visible).
+ *   2. RUNG 3 — ROOT REVISIT — launch the app's own launcher intent with
+ *      CLEAR_TOP|SINGLE_TOP. The app's root activity comes forward and
+ *      everything stacked above it is finished. Same app, same task.
+ *   3. RUNG 4 — HOME — the old kick-out. Only when everything above
+ *      failed, or for platforms with NO safe in-app surface (TikTok: the
+ *      whole app IS the feed; Chrome: a shorts URL is just a tab).
+ *
+ * CLOSED LOOP: each detection advances the per-package rung counter; the
+ * a11y service's scheduled re-scans (+500/+1500/+3000 ms) re-run detection
+ * after every redirect, so a redirect that DIDN'T stick (the old Facebook
+ * bug: root-revisit reported success but the reels screen survived)
+ * automatically advances to the next rung instead of silently winning.
+ * The counter self-resets after RUNG_RESET_MS without a detection.
  *
  * SECURITY: this navigates the TARGET app only. It never weakens the
  * escalation ladder, quotas, debounces or violation recording — those are
  * untouched (rules swap signatures only, TRD §34–35).
  */
 object ReelsRedirect {
+
+    /** v2.9 r16 — closed-loop rung bookkeeping (per package). Rung 1 =
+     * BACK, 2 = click Home tab, 3 = root revisit, 4+ = caller's HOME
+     * fallback. Reset after RUNG_RESET_MS without a new detection. */
+    private val rungs = HashMap<String, Int>()
+    private val rungAt = HashMap<String, Long>()
+    private const val RUNG_RESET_MS = 20_000L
+
+    private fun advanceRung(pkg: String): Int {
+        val now = android.os.SystemClock.elapsedRealtime()
+        synchronized(rungs) {
+            if (now - (rungAt[pkg] ?: 0L) > RUNG_RESET_MS) rungs[pkg] = 0
+            rungAt[pkg] = now
+            val r = (rungs[pkg] ?: 0) + 1
+            rungs[pkg] = r
+            return r
+        }
+    }
+
+    /** Forget the ladder (e.g. the user disabled the shorts blocker). */
+    fun reset(pkg: String) = synchronized(rungs) {
+        rungs.remove(pkg)
+        rungAt.remove(pkg)
+    }
 
     /** Bottom-nav tab labels worth clicking, per platform. Exact match on
      *  the trimmed label (so "Home" never matches "Homescreen"); English
@@ -63,14 +97,22 @@ object ReelsRedirect {
 
     /**
      * From the accessibility service (has the node tree). Returns TRUE when
-     * the user was kept inside the app (step 1 or 2 succeeded) — the caller
-     * should then SKIP its GLOBAL_ACTION_HOME fallback.
+     * the user was kept inside the app (a rung succeeded) — the caller
+     * should then SKIP its GLOBAL_ACTION_HOME fallback. Rung 4 returns
+     * false on purpose: after three failed in-app attempts the caller's
+     * HOME kick-out is the honest answer.
      */
     fun navigateFromService(service: AccessibilityService, pkg: String): Boolean {
         if (pkg in NO_SAFE_SURFACE) return false
-        if (tryClickHomeTab(service, pkg)) return true
-        if (tryRevisitRoot(service, pkg)) return true
-        return false
+        return when (advanceRung(pkg)) {
+            1 -> tryBackPress(service) ||
+                tryClickHomeTab(service, pkg) ||
+                tryRevisitRoot(service, pkg)
+            2 -> tryClickHomeTab(service, pkg) ||
+                tryRevisitRoot(service, pkg)
+            3 -> tryRevisitRoot(service, pkg)
+            else -> false
+        }
     }
 
     /**
@@ -84,7 +126,25 @@ object ReelsRedirect {
     }
 
     // -----------------------------------------------------------------
-    // Step 1 — click the app's own Home tab
+    // Rung 1 — BACK press closes the immersive player
+    // -----------------------------------------------------------------
+
+    /** A consumed BACK = the player is dismissing (feed lands behind it).
+     *  Returns false only when the system refused the action — then the
+     *  caller immediately tries the next rung (same invocation). */
+    private fun tryBackPress(service: AccessibilityService): Boolean {
+        return try {
+            val consumed = service.performGlobalAction(
+                AccessibilityService.GLOBAL_ACTION_BACK)
+            if (consumed) DiagLog.log("REELS_REDIRECT", "BACK pressed (player dismiss)")
+            consumed
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Rung 2 — click the app's own Home tab
     // -----------------------------------------------------------------
 
     private fun tryClickHomeTab(service: AccessibilityService, pkg: String): Boolean {
@@ -148,7 +208,7 @@ object ReelsRedirect {
     }
 
     // -----------------------------------------------------------------
-    // Step 2 — revisit the app's root activity (still the same app)
+    // Rung 3 — revisit the app's root activity (still the same app)
     // -----------------------------------------------------------------
 
     private fun tryRevisitRoot(context: Context, pkg: String): Boolean {
