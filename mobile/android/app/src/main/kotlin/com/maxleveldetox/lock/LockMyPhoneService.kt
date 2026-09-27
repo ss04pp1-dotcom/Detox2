@@ -510,6 +510,10 @@ object LockMyPhoneController {
         put("attempts", attempts(context))
         put("adminStripped", adminStripped(context))
         put("reason", json?.optString("reason") ?: "")
+        // v2.6 reference design: total session length so the Flutter ring
+        // timer can show real progress (additive, defaults to 0 for old
+        // sessions).
+        put("totalSeconds", json?.optInt("durationSeconds") ?: 0)
     }
 
     fun isAdminActive(context: Context): Boolean {

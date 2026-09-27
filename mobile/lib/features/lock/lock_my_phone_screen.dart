@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../data/native_bridge.dart';
+import '../../shared/mld_timer.dart';
 import '../../shared/mld_widgets.dart';
 import 'lock_schedules_section.dart';
 
@@ -93,6 +94,7 @@ class _LockMyPhoneScreenState extends State<LockMyPhoneScreen> {
     final active = _status?['active'] as bool? ?? false;
     // v2.5.5 audit fix: defensive num casts — `as int?` throws on a stray
     // double/Long from the platform channel.
+    final total = ((_status?['totalSeconds'] as num?) ?? 0).toInt();
     final remaining = ((_status?['remainingSeconds'] as num?) ?? 0).toInt();
     final attempts = ((_status?['attempts'] as num?) ?? 0).toInt();
 
@@ -105,37 +107,74 @@ class _LockMyPhoneScreenState extends State<LockMyPhoneScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (active) ...[
+                // v2.6 reference design (mockup Screen 28): red accent,
+                // glowing ring timer, Use Coins / View Schedule.
                 MLDCard(
+                  borderColor: AppColors.lock.withValues(alpha: 0.4),
                   child: Column(
                     children: [
-                      const MLDSectionHeader(title: 'LOCKED'),
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.lock.withValues(alpha: 0.12),
+                          border:
+                              Border.all(color: AppColors.lock.withValues(alpha: 0.35)),
+                        ),
+                        child: const Icon(Icons.phonelink_lock,
+                            size: 30, color: AppColors.lock),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      const Text('Your phone is locked',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 20)),
+                      const SizedBox(height: AppSpacing.md),
+                      MLDStatusChip(
+                        label: 'ACTIVE • ${_fmtLong(remaining)} LEFT',
+                        color: AppColors.lock,
+                      ),
+                      const SizedBox(height: AppSpacing.xxl),
+                      MLDTimer(
+                        remainingSeconds: remaining,
+                        ringProgress: total > 0 ? 1 - (remaining / total) : null,
+                        color: AppColors.textPrimary,
+                        ringColor: AppColors.lock,
+                        size: 40,
+                      ),
                       const SizedBox(height: AppSpacing.md),
                       Text(
-                        _fmt(remaining),
-                        style: const TextStyle(
-                            fontSize: 52,
-                            fontWeight: FontWeight.w700,
-                            fontFeatures: [FontFeature.tabularFigures()]),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'The phone re-locks itself every 1.5 seconds.\n'
-                        'Power button, recents, home — all covered.',
-                        textAlign: TextAlign.center,
+                        'Unlock with coins or wait for the timer.',
                         style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 13),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text('$attempts unlock attempts logged',
-                          style: const TextStyle(fontSize: 12)),
+                          style: const TextStyle(
+                              color: AppColors.textDisabled, fontSize: 12)),
                     ],
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xxl),
+                MLDButton(
+                  label: 'Use Coins',
+                  icon: Icons.monetization_on_outlined,
+                  onPressed: () => Navigator.of(context)
+                      .pushNamed('/coins'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                MLDButton(
+                  label: 'View Schedule',
+                  icon: Icons.schedule,
+                  variant: MLDButtonVariant.secondary,
+                  onPressed: () => Navigator.of(context).pushNamed('/settings/schedules'),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
                 const Text(
-                  'This session ends only at the timer — or via the coin '
-                  'bailout (Coins screen → Bailout). There is no other exit '
-                  'by design.',
+                  'The phone re-locks itself every 1.5 seconds. Power button, '
+                  'recents, home — all covered. This session ends only at the '
+                  'timer — or via the coin bailout (Coins screen → Bailout). '
+                  'There is no other exit by design.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
@@ -234,5 +273,13 @@ class _LockMyPhoneScreenState extends State<LockMyPhoneScreen> {
     final m = seconds ~/ 60;
     final s = seconds % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  /// "2h 30m" / "45m" — for the status chip (v2.6 reference design).
+  String _fmtLong(int s) {
+    final h = s ~/ 3600;
+    final m = (s % 3600) ~/ 60;
+    if (h > 0) return '${h}h ${m}m';
+    return '${m}m';
   }
 }

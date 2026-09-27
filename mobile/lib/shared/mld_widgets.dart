@@ -645,6 +645,103 @@ class MLDWarningDots extends StatelessWidget {
   }
 }
 
+/// MLDStatusChip — tinted status pill with a colored dot, e.g.
+/// "RUNNING • 1H 25M LEFT" (v2.6 reference design: every active session
+/// screen carries one under the mode title).
+class MLDStatusChip extends StatelessWidget {
+  const MLDStatusChip({
+    super.key,
+    required this.label,
+    required this.color,
+    this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            label,
+            style: AppTypography.label(color: color).copyWith(letterSpacing: 0.8),
+          ),
+          if (icon != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            Icon(icon, size: 14, color: color),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// MLDModeTile — quick-action grid tile for an enforcement mode (v2.6
+/// reference design "Quick Actions"): tinted icon container, title and a
+/// one-line promise in the mode's signature color.
+class MLDModeTile extends StatelessWidget {
+  const MLDModeTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      child: MLDCard(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+                border: Border.all(color: accent.withValues(alpha: 0.3)),
+              ),
+              child: Icon(icon, color: accent, size: 22),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(title, style: AppTypography.body(weight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: AppTypography.caption()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Simple weekly bar chart, zero dependencies (UI/UX §37 "keep charts simple").
 class MLDBarChart extends StatelessWidget {
   const MLDBarChart({

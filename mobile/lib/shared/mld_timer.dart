@@ -5,8 +5,12 @@ import 'package:flutter/material.dart';
 import '../core/theme/tokens.dart';
 
 /// MLDTimer — the single most important widget during enforcement
-/// (UI/UX §22): huge tabular numerals, optional progress ring that stays
-/// visually SECONDARY to the digits.
+/// (UI/UX §22): huge tabular numerals, progress ring that stays visually
+/// SECONDARY to the digits.
+///
+/// v2.6 reference design: the ring is a thick (10px) rounded-cap arc with a
+/// soft outer glow and a subtle color sweep — the signature visual of the
+/// running session screens.
 class MLDTimer extends StatelessWidget {
   const MLDTimer({
     super.key,
@@ -81,29 +85,52 @@ class _RingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final stroke = 6.0;
+    // v2.6 reference design: thick 10px stroke with rounded caps and a soft
+    // accent glow behind the arc (mockup "Glow Effects").
+    final stroke = 10.0;
+    final glow = stroke * 2.2;
     final rect = Offset.zero & size;
-    final radius = (size.shortestSide - stroke) / 2;
     final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - stroke) / 2;
 
+    // Track.
     final track = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..color = trackColor;
     canvas.drawCircle(center, radius, track);
 
+    if (progress <= 0) return;
+
+    final arcRect = rect.deflate(stroke / 2);
+    final sweep = 2 * math.pi * progress;
+    const start = -math.pi / 2;
+
+    // Soft outer glow — a wider, blurred, low-alpha pass behind the arc.
+    final glowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = glow
+      ..strokeCap = StrokeCap.round
+      ..color = color.withValues(alpha: 0.18)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    canvas.drawArc(arcRect, start, sweep, false, glowPaint);
+
+    // Gradient arc — sweeps from the accent to a lighter, lifted tone so
+    // the ring reads as lit from the top.
     final arc = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round
-      ..color = color;
-    canvas.drawArc(
-      rect.deflate(stroke / 2),
-      -math.pi / 2,
-      2 * math.pi * progress,
-      false,
-      arc,
-    );
+      ..shader = SweepGradient(
+        startAngle: start,
+        endAngle: start + sweep,
+        colors: [
+          color.withValues(alpha: 0.55),
+          color,
+        ],
+        transform: const GradientRotation(-math.pi / 2),
+      ).createShader(rect);
+    canvas.drawArc(arcRect, start, sweep, false, arc);
   }
 
   @override

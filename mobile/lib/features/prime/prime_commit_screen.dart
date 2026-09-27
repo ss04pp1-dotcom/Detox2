@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../data/native_bridge.dart';
+import '../../shared/mld_timer.dart';
 import '../../shared/mld_widgets.dart';
 
 /// PrimeCommitScreen (v2.5 r9) — SS Prime Mode port: an all-or-nothing
@@ -161,25 +162,53 @@ class _PrimeCommitScreenState extends State<PrimeCommitScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (active) ...[
+                // v2.6 reference design (mockup Screen 24): violet accent,
+                // status chip, TOTP-verified badge.
                 MLDCard(
+                  borderColor: AppColors.prime.withValues(alpha: 0.4),
                   child: Column(
                     children: [
-                      const MLDSectionHeader(title: 'PRIME COMMITMENT LIVE'),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        _fmt(remaining),
-                        style: const TextStyle(
-                          fontSize: 52,
-                          fontWeight: FontWeight.w700,
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.prime.withValues(alpha: 0.12),
+                          border:
+                              Border.all(color: AppColors.prime.withValues(alpha: 0.35)),
                         ),
+                        child: const Icon(Icons.military_tech,
+                            size: 30, color: AppColors.prime),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.lg),
+                      const Text('Prime Commit',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 22)),
+                      const SizedBox(height: AppSpacing.md),
+                      MLDStatusChip(
+                        label: 'ACTIVE • ${_fmtLong(remaining)} LEFT',
+                        color: AppColors.prime,
+                      ),
+                      const SizedBox(height: AppSpacing.xxl),
+                      MLDTimer(
+                        remainingSeconds: remaining,
+                        // Prime status carries no total — a ring progress
+                        // cannot be computed honestly, so digits only.
+                        color: AppColors.prime,
+                        size: 44,
+                        showRing: false,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
                       const Text(
-                        'No unlocks. No bailouts. No categories.\n'
-                        'DNS protection is locked (tamper-guarded).',
-                        textAlign: TextAlign.center,
+                        'No temp unlocks. No bailout. Just you and your goals.',
                         style: TextStyle(
                             color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      const MLDStatusChip(
+                        label: 'TOTP VERIFIED',
+                        color: AppColors.success,
+                        icon: Icons.verified_outlined,
                       ),
                     ],
                   ),
@@ -259,5 +288,13 @@ class _PrimeCommitScreenState extends State<PrimeCommitScreen> {
     return h > 0
         ? '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}'
         : '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  /// "12h 45m" / "45m" — for the status chip (v2.6 reference design).
+  String _fmtLong(int s) {
+    final h = s ~/ 3600;
+    final m = (s % 3600) ~/ 60;
+    if (h > 0) return '${h}h ${m}m';
+    return '${m}m';
   }
 }

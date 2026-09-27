@@ -22,6 +22,8 @@ class _CompletionScreenState extends State<CompletionScreen> {
   // right after the user paid the 500-coin bailout. Read the real
   // last-session outcome from native history instead.
   bool _lastBailedOut = false;
+  int _focusMinutes = 0;
+  int _violations = 0;
 
   @override
   void initState() {
@@ -34,12 +36,25 @@ class _CompletionScreenState extends State<CompletionScreen> {
     final history = await NativeBridge.instance.getHistory(limit: 1);
     if (!mounted) return;
     if (history.isNotEmpty) {
-      setState(() => _lastBailedOut = history.first.bailedOut);
+      setState(() {
+        _lastBailedOut = history.first.bailedOut;
+        _focusMinutes = history.first.durationMinutes;
+        _violations = history.first.violations;
+      });
     }
+  }
+
+  String get _focusLabel {
+    final h = _focusMinutes ~/ 60;
+    final m = _focusMinutes % 60;
+    if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
+    return '${m}m';
   }
 
   @override
   Widget build(BuildContext context) {
+    final progress = AppStateScope.of(context).state.progress;
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -64,26 +79,58 @@ class _CompletionScreenState extends State<CompletionScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.massive),
-              Text('COMMITMENT\nCOMPLETE',
+              // v2.6 reference design (mockup Screen 27).
+              Text('Session Completed!',
                   textAlign: TextAlign.center,
                   style: AppTypography.display(color: AppColors.success)),
-              const SizedBox(height: AppSpacing.xxl),
-              Text('You finished what you started.',
+              const SizedBox(height: AppSpacing.md),
+              Text('Great job! You stayed focused.',
                   style: AppTypography.body(color: AppColors.textSecondary, weight: FontWeight.w500)),
               const Spacer(),
-              MLDCard(
-                child: Column(
-                  children: [
-                    _row('Session completed', true),
-                    _row('Rules maintained', true),
-                    _row(_lastBailedOut ? 'Ended via bailout' : 'No bailout',
-                        !_lastBailedOut),
-                  ],
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatCard(
+                      icon: Icons.timer_outlined,
+                      accent: AppColors.success,
+                      label: 'Focus Time',
+                      value: _focusLabel,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: _StatCard(
+                      icon: Icons.block_outlined,
+                      accent: AppColors.primary,
+                      label: 'Attempts Blocked',
+                      value: '$_violations',
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: _StatCard(
+                      icon: Icons.terrain_outlined,
+                      accent: AppColors.monk,
+                      label: 'DP Balance',
+                      value: progress == null ? '—' : '${progress.dp}',
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: AppSpacing.lg),
+              if (_lastBailedOut)
+                const MLDWarningBanner(
+                  message: 'This session ended via the coin bailout.',
+                  tone: MLDBannerTone.warning,
+                )
+              else
+                const MLDWarningBanner(
+                  message: 'No bailout — you kept your commitment.',
+                  tone: MLDBannerTone.success,
+                ),
               const SizedBox(height: AppSpacing.xxxl),
               MLDButton(
-                label: 'DONE',
+                label: 'BACK TO HOME',
                 onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(
                   AppConstants.routeShell,
                   (route) => false,
@@ -96,15 +143,40 @@ class _CompletionScreenState extends State<CompletionScreen> {
       ),
     );
   }
+}
 
-  Widget _row(String label, bool good) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: Row(
+/// Compact outcome stat card (v2.6 reference design Screen 27).
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.icon,
+    required this.accent,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(color: AppColors.edge),
+      ),
+      child: Column(
         children: [
-          Icon(good ? Icons.check_circle : Icons.cancel, color: good ? AppColors.success : AppColors.danger, size: 20),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(child: Text(label, style: AppTypography.body(weight: FontWeight.w500))),
+          Icon(icon, color: accent, size: 20),
+          const SizedBox(height: AppSpacing.md),
+          Text(value, style: AppTypography.heading().copyWith(fontSize: 19)),
+          const SizedBox(height: 2),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: AppTypography.caption().copyWith(fontSize: 11)),
         ],
       ),
     );

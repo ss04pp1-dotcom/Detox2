@@ -33,6 +33,23 @@ abstract final class AppColors {
   static const Color cageBackground = Color(0xFF140B0B);
   static const Color cageSurface = Color(0xFF241111);
 
+  // Mode accents (v2.6 reference design) — every enforcement mode carries
+  // its own signature color so the user can tell state at a glance:
+  // Study = teal · Detox = fuchsia · Monk = amber · Lock = red ·
+  // Safety Pause = cyan · Prime Commit = violet.
+  static const Color study = Color(0xFF00D2A0); // teal
+  static const Color studyDim = Color(0xFF00A080);
+  static const Color detox = Color(0xFFD946EF); // fuchsia
+  static const Color detoxDim = Color(0xFFA21FAF);
+  static const Color monk = Color(0xFFF59E0B); // amber
+  static const Color monkDim = Color(0xFFD97706);
+  static const Color lock = Color(0xFFEF4444); // red (matches danger)
+  static const Color lockDim = Color(0xFFDC2626);
+  static const Color safety = Color(0xFF22D3EE); // cyan
+  static const Color safetyDim = Color(0xFF0891B2);
+  static const Color prime = Color(0xFF7C3AED); // violet
+  static const Color primeDim = Color(0xFF6D28D9);
+
   static const Color onPrimary = Color(0xFFFFFFFF);
 }
 

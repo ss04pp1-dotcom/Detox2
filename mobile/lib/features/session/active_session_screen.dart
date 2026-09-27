@@ -92,51 +92,70 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     if (s.isPaused) return _BreakView(session: s);
 
     final isDetox = s.mode == SessionMode.detox;
-    final accent = isDetox ? AppColors.danger : AppColors.primary;
+    // v2.6 reference design — each mode carries its signature accent.
+    final accent = isDetox ? AppColors.detox : AppColors.study;
     final tempUnlock = app.state.tempUnlock;
+    final unlockActive = tempUnlock?.active == true;
 
     return Scaffold(
-      backgroundColor: isDetox ? const Color(0xFF120D16) : AppColors.background,
+      backgroundColor: isDetox ? const Color(0xFF160D18) : AppColors.background,
       body: SafeArea(
         child: Padding(
           padding: AppSpacing.screenH.copyWith(top: AppSpacing.xl, bottom: AppSpacing.xxl),
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(isDetox ? Icons.spa_outlined : Icons.menu_book_outlined,
-                      size: 18, color: accent),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    isDetox ? 'DETOX ACTIVE' : 'STUDY MODE',
-                    style: AppTypography.label(color: accent),
-                  ),
-                ],
+              const SizedBox(height: AppSpacing.xl),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent.withValues(alpha: 0.12),
+                  border: Border.all(color: accent.withValues(alpha: 0.35)),
+                ),
+                child: Icon(
+                  isDetox ? Icons.spa_outlined : Icons.menu_book_outlined,
+                  size: 34,
+                  color: accent,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                isDetox ? 'Detox Mode' : 'Study Mode',
+                style: AppTypography.heading(),
               ),
               if (!isDetox && s.subjectName.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xs),
                 Text(s.subjectName,
                     style: AppTypography.caption(color: AppColors.textSecondary)),
               ],
+              const SizedBox(height: AppSpacing.md),
+              MLDStatusChip(
+                label: unlockActive
+                    ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)} LEFT'
+                    : 'RUNNING • ${_fmtLong(s.remainingSeconds)} LEFT',
+                color: unlockActive ? AppColors.success : accent,
+              ),
               const Spacer(),
               MLDTimer(
                 remainingSeconds: s.remainingSeconds,
                 ringProgress: s.progress,
-                color: tempUnlock?.active == true ? AppColors.success : AppColors.textPrimary,
-                ringColor: tempUnlock?.active == true ? AppColors.success : accent,
+                color: unlockActive ? AppColors.success : AppColors.textPrimary,
+                ringColor: unlockActive ? AppColors.success : accent,
+                size: 48,
               ),
-              const SizedBox(height: AppSpacing.xxl),
+              const SizedBox(height: AppSpacing.lg),
               Text(
-                tempUnlock?.active == true
-                    ? 'TEMPORARY UNLOCK · ${_fmt(tempUnlock!.remainingSeconds)} LEFT'
-                    : (isDetox
-                        ? 'DO NOT BREAK YOUR COMMITMENT'
-                        : 'FOCUS ACTIVE'),
+                'Remaining',
+                style: AppTypography.label(),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                isDetox
+                    ? 'No distractions! Keep going!'
+                    : 'Focus active — distractions stay blocked.',
                 textAlign: TextAlign.center,
-                style: AppTypography.caption(
-                  color: tempUnlock?.active == true ? AppColors.success : AppColors.textSecondary,
-                ),
+                style: AppTypography.caption(color: AppColors.textSecondary),
               ),
               const Spacer(),
               Row(
@@ -155,45 +174,121 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               ),
               const SizedBox(height: AppSpacing.xxl),
 
+              // Primary control row (v2.6 reference design: Pause / End / Details).
+              Row(
+                children: [
+                  if (!isDetox &&
+                      s.status == SessionStatus.active &&
+                      !unlockActive &&
+                      s.pauseCount < s.maxPauses) ...[
+                    Expanded(
+                      child: MLDButton(
+                        label: 'Pause',
+                        icon: Icons.pause_rounded,
+                        expanded: false,
+                        height: 48,
+                        onPressed: _pickBreak,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                  ],
+                  Expanded(
+                    child: MLDButton(
+                      label: 'End',
+                      icon: Icons.stop_rounded,
+                      variant: MLDButtonVariant.danger,
+                      expanded: false,
+                      height: 48,
+                      onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeBailout),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: MLDButton(
+                      label: 'Details',
+                      icon: Icons.info_outline,
+                      variant: MLDButtonVariant.secondary,
+                      expanded: false,
+                      height: 48,
+                      onPressed: () => _showDetails(s),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+
               MLDButton(
-                label: tempUnlock?.active == true
+                label: unlockActive
                     ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)}'
                     : 'TEMPORARY UNLOCK · 5 coins = 5 min',
                 icon: Icons.lock_open,
                 onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeTempUnlock),
               ),
-              if (!isDetox &&
-                  s.status == SessionStatus.active &&
-                  tempUnlock?.active != true &&
-                  s.pauseCount < s.maxPauses) ...[
-                const SizedBox(height: AppSpacing.md),
-                MLDButton(
-                  label: 'TAKE A BREAK · ${s.maxPauses - s.pauseCount} left',
-                  icon: Icons.coffee_outlined,
-                  variant: MLDButtonVariant.secondary,
-                  onPressed: _pickBreak,
-                ),
-              ],
               const SizedBox(height: AppSpacing.md),
 
               // Emergency is ALWAYS discoverable (PRD §27, UI/UX §88).
               TextButton.icon(
                 onPressed: () => NativeBridge.instance.openEmergencyDialer(),
                 icon: const Icon(Icons.emergency_outlined, size: 18, color: AppColors.danger),
-                label: const Text('Emergency',
+                label: const Text('Emergency Call',
                     style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)),
-              ),
-
-              const SizedBox(height: AppSpacing.xl),
-              TextButton(
-                onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeBailout),
-                style: TextButton.styleFrom(foregroundColor: AppColors.textDisabled),
-                child: const Text('End session early',
-                    style: TextStyle(fontSize: 12, decoration: TextDecoration.underline)),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Session details sheet (mockup Screen 26): the summary facts plus the
+  /// secondary controls that used to clutter the main session screen.
+  Future<void> _showDetails(SessionSnapshot s) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xxl, AppSpacing.xxl, AppSpacing.xxl, AppSpacing.xxl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Session Details', style: AppTypography.section()),
+              const SizedBox(height: AppSpacing.xxl),
+              _detailRow('Mode', s.mode == SessionMode.detox ? 'Detox' : 'Study'),
+              _detailRow('Time', '${_fmtLong(s.remainingSeconds)} of ${_fmtLong(s.totalSeconds)} remaining'),
+              _detailRow('Progress', '${(s.progress * 100).round()}%'),
+              _detailRow(
+                  'Apps ${s.mode == SessionMode.detox ? 'restricted' : 'blocked'}',
+                  '${s.blockedAppCount}'),
+              if (s.mode != SessionMode.detox)
+                _detailRow('Breaks used', '${s.pauseCount} of ${s.maxPauses}'),
+              _detailRow('Warnings', '${s.violationCount}'),
+              const SizedBox(height: AppSpacing.xl),
+              MLDButton(
+                label: 'CLOSE',
+                variant: MLDButtonVariant.secondary,
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: AppTypography.caption())),
+          Text(value, style: AppTypography.body(weight: FontWeight.w700)),
+        ],
       ),
     );
   }
@@ -232,6 +327,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     final m = s ~/ 60;
     final sec = s % 60;
     return '$m:${sec.toString().padLeft(2, '0')}';
+  }
+
+  /// "1h 25m" / "45m" — for status chips (v2.6 reference design).
+  String _fmtLong(int s) {
+    final h = s ~/ 3600;
+    final m = (s % 3600) ~/ 60;
+    if (h > 0) return '${h}h ${m}m';
+    return '${m}m';
   }
 }
 

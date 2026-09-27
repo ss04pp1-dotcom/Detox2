@@ -133,32 +133,60 @@ class _MonkModeScreenState extends State<MonkModeScreen> {
     // platform channel would previously throw on `as int?`).
     final since = ((_status?['sinceWallMs'] as num?) ?? 0).toInt();
     final calls = ((_status?['callDetections'] as num?) ?? 0).toInt();
+    final elapsedMs = DateTime.now().millisecondsSinceEpoch - since;
     return SingleChildScrollView(
       padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           MLDCard(
+            borderColor: AppColors.monk.withValues(alpha: 0.4),
             child: Column(
               children: [
-                const Icon(Icons.self_improvement,
-                    size: 48, color: AppColors.primary),
-                const SizedBox(height: AppSpacing.md),
-                const Text('MONK MODE ACTIVE',
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.monk.withValues(alpha: 0.12),
+                    border: Border.all(
+                        color: AppColors.monk.withValues(alpha: 0.35)),
+                  ),
+                  child: const Icon(Icons.self_improvement,
+                      size: 34, color: AppColors.monk),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                const Text('Monk Mode',
                     style: TextStyle(
-                        fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 22,
+                        letterSpacing: -0.3)),
+                const SizedBox(height: AppSpacing.md),
+                MLDStatusChip(
+                  label:
+                      'IN PROGRESS • ${_elapsedLabel(elapsedMs)} IN',
+                  color: AppColors.monk,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  'Only your allowlisted apps are reachable.\n'
-                  'Calls are detected via audio-mode and pause the lock.',
+                  'Only allowed apps are accessible. Stay strong!',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: AppColors.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  'Since ${_sinceLabel(since)} · $calls call pauses',
-                  style: const TextStyle(fontSize: 12),
+                  'Calls are detected via audio-mode and pause the lock.\n'
+                  '$calls call pauses · since ${_sinceLabel(since)}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: AppColors.textDisabled, fontSize: 12),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                MLDStatusChip(
+                  label: 'EMERGENCY CALL AVAILABLE',
+                  color: AppColors.success,
+                  icon: Icons.call_outlined,
                 ),
               ],
             ),
@@ -184,7 +212,7 @@ class _MonkModeScreenState extends State<MonkModeScreen> {
           // confirm, no DP refunded (this is an early exit from a
           // discipline window, same friction model as the bailout).
           MLDHoldToConfirmButton(
-            label: 'DEACTIVATE NOW (no DP)',
+            label: 'END MONK MODE (no DP)',
             onConfirmed: _deactivate,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -302,5 +330,12 @@ class _MonkModeScreenState extends State<MonkModeScreen> {
     if (since == null) return 'earlier';
     final mins = DateTime.now().millisecondsSinceEpoch - since;
     return '${(mins / 60000).round()} min ago';
+  }
+
+  /// "1h 5m" / "45m" — for the status chip (v2.6 reference design).
+  String _elapsedLabel(int ms) {
+    final m = (ms / 60000).round();
+    if (m >= 60) return '${m ~/ 60}h ${m % 60}m';
+    return '${m}m';
   }
 }

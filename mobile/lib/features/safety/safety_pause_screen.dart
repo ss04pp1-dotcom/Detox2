@@ -98,10 +98,35 @@ class _SafetyPauseScreenState extends State<SafetyPauseScreen> {
             : ListView(
                 padding: AppSpacing.screenH.copyWith(bottom: AppSpacing.xxxl),
                 children: [
+                  // v2.6 reference design: cyan mode accent hero.
                   MLDCard(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.safety.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(AppRadii.sm),
+                                border: Border.all(
+                                    color: AppColors.safety.withValues(alpha: 0.3)),
+                              ),
+                              child: const Icon(Icons.pause_circle_outline,
+                                  color: AppColors.safety, size: 22),
+                            ),
+                            const SizedBox(width: AppSpacing.lg),
+                            Expanded(
+                              child: Text('Safety Pause',
+                                  style: AppTypography.body(
+                                      weight: FontWeight.w800, fontSize: 17)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.md),
                         SwitchListTile(
                           value: _enabled,
                           onChanged: _busy ? null : _toggle,

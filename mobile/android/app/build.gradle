@@ -52,11 +52,15 @@ android {
         applicationId = "com.maxleveldet0x"
         minSdk = 26          // Android 8.0 — covers ~98% of active devices
         targetSdk = 35
-        versionCode = 24
-        // 2.5.9 = 2.5.6 (audit fixes) + r10 fixes + r11 roadmap (leaderboard,
-        // clubs, dynamic detection rules, trend widget) + r11.1 opportunity
-        // cost nudges — see docs/R9-R11.1-CHANGES.md.
-        versionName = "2.5.10"
+        versionCode = 25
+        // 2.6.0 = 2.5.10 (r11.2 audit) + the reference-design release: mode
+        // accent palette (Study teal / Detox fuchsia / Monk amber / Lock
+        // red / Safety cyan / Prime violet), glowing gradient timer rings,
+        // 5-tab shell (Home, Insights, Community, Tasks, Settings), Quick
+        // Actions grid, session Pause/End/Details + details sheet, Lock
+        // ring timer, Prime TOTP chip, completion stat cards — see
+        // docs/R12-CHANGES.md.
+        versionName = "2.6.0"
         ndk {
             // r7-era distribution target: single-ABI arm64 release (no
             // split-per-abi versionCode offsets — keeps versionCode pure).

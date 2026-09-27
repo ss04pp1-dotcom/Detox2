@@ -7,16 +7,20 @@ import '../../data/api_client.dart';
 import '../../data/models.dart';
 import '../../main.dart';
 import '../../shared/mld_widgets.dart';
+import '../community/community_screen.dart';
 import '../insights/insights_screen.dart';
 import '../session/active_session_screen.dart';
 import '../settings/settings_screen.dart';
-import '../study/study_setup_screen.dart';
+import '../tasks/tasks_screen.dart';
 
 /// Dashboard + bottom navigation shell (UI/UX §9, §14, §63).
 ///
+/// v2.6 reference design: five tabs — Home, Insights, Community, Tasks,
+/// Settings — with the six enforcement modes launched from the Home
+/// "Quick Actions" grid, each in its signature color.
+///
 /// Home must answer three questions instantly:
 ///   1. What is my current state?  2. How much have I focused?  3. What next?
-/// Eight distinct home states — each with its own visual hierarchy.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -39,9 +43,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final pages = [
       const _HomePage(),
-      const _FocusTabPage(),
-      const _DetoxTabPage(),
       const _InsightsTabPage(),
+      const _CommunityTabPage(),
+      const _TasksTabPage(),
       const _SettingsTabPage(),
     ];
 
@@ -61,9 +65,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           height: 68,
           destinations: [
             const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-            const NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Focus'),
-            const NavigationDestination(icon: Icon(Icons.spa_outlined), selectedIcon: Icon(Icons.spa), label: 'Detox'),
             const NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Insights'),
+            const NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: 'Community'),
+            const NavigationDestination(icon: Icon(Icons.checklist_outlined), selectedIcon: Icon(Icons.checklist), label: 'Tasks'),
             const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
           ],
         ),
@@ -84,7 +88,7 @@ class ActiveSessionShell extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// HOME — 8 states (UI/UX §63)
+// HOME (v2.6 reference design — Screens 17/18/25)
 // ---------------------------------------------------------------------------
 
 class _HomePage extends StatefulWidget {
@@ -175,13 +179,13 @@ class _HomePageState extends State<_HomePage> with WidgetsBindingObserver {
               ),
             ],
             const SizedBox(height: AppSpacing.xxl),
-            const _HeroStatus(),
+            const _StatsRow(),
             const SizedBox(height: AppSpacing.xxl),
-            const _ProgressStrip(),
-            const SizedBox(height: AppSpacing.xxl),
-            const _TodayProgress(),
+            const _TodayFocus(),
             const SizedBox(height: AppSpacing.xxl),
             const _QuickActions(),
+            const SizedBox(height: AppSpacing.xxl),
+            const _MoreTools(),
           ],
         ),
       ),
@@ -248,35 +252,167 @@ class _OfferBanner extends StatelessWidget {
   }
 }
 
+/// Header (mockup Screen 17): greeting + tagline, avatar chip on the right.
 class _Greeting extends StatelessWidget {
   const _Greeting();
 
   String get _greeting {
     final h = DateTime.now().hour;
     if (h < 5) return 'Late night focus';
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return 'Good morning.';
+    if (h < 17) return 'Good afternoon.';
+    return 'Good evening.';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final progress = AppStateScope.of(context).state.progress;
+
+    return Row(
       children: [
-        Text(_greeting, style: AppTypography.heading()),
-        const SizedBox(height: 4),
-        Text('Your phone is yours. Your rules are ready.',
-            style: AppTypography.caption()),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_greeting, style: AppTypography.heading()),
+              const SizedBox(height: 4),
+              Text('Focus today, build tomorrow.',
+                  style: AppTypography.caption()),
+            ],
+          ),
+        ),
+        if (progress != null && progress.enabled) ...[
+          const SizedBox(width: AppSpacing.md),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primary, AppColors.premium],
+              ),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.terrain_outlined,
+                    color: AppColors.onPrimary, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  'LVL ${progress.level}',
+                  style: AppTypography.label(color: AppColors.onPrimary)
+                      .copyWith(letterSpacing: 0.6),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
-/// READY / hero area (UI/UX §15). Inactive state only — active sessions
-/// replace the entire shell.
-class _HeroStatus extends StatelessWidget {
-  const _HeroStatus();
+/// Stats row (mockup Screen 17): Current Streak + DP Points cards.
+class _StatsRow extends StatelessWidget {
+  const _StatsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = AppStateScope.of(context).state.progress;
+    final shortsCount = AppStateScope.of(context).state.shorts.warningCount;
+    if (progress == null || !progress.enabled) {
+      // Progress layer disabled — keep the row useful with what remains.
+      return Row(
+        children: [
+          Expanded(
+            child: MLDStatTile(
+              label: 'Shorts attempts',
+              value: '$shortsCount',
+              accent: AppColors.warning,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: _statCard(
+            context: context,
+            icon: Icons.local_fire_department_outlined,
+            accent: AppColors.monk,
+            label: 'Current Streak',
+            value: '${progress.streakDays} Days',
+            onTap: () => Navigator.of(context).pushNamed(AppConstants.routeProgress),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: _statCard(
+            context: context,
+            icon: Icons.terrain_outlined,
+            accent: AppColors.primary,
+            label: 'DP Points',
+            value: '${progress.dp}',
+            onTap: () => Navigator.of(context).pushNamed(AppConstants.routeProgress),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: _statCard(
+            context: context,
+            icon: Icons.block_outlined,
+            accent: AppColors.warning,
+            label: 'Shorts attempts',
+            value: '$shortsCount',
+            onTap: () => Navigator.of(context).pushNamed(AppConstants.routeShortsSettings),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statCard({
+    required BuildContext context,
+    required IconData icon,
+    required Color accent,
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.sm),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          border: Border.all(color: AppColors.edge),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: accent, size: 20),
+            const SizedBox(height: AppSpacing.md),
+            Text(value,
+                style: AppTypography.heading().copyWith(fontSize: 20)),
+            const SizedBox(height: 2),
+            Text(label, style: AppTypography.caption()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Today's Focus" hero (mockup Screens 17/18): when no session is running
+/// this is the No Active Session card with the Choose Mode CTA that jumps
+/// straight to the Quick Actions grid.
+class _TodayFocus extends StatelessWidget {
+  const _TodayFocus();
 
   @override
   Widget build(BuildContext context) {
@@ -293,11 +429,25 @@ class _HeroStatus extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text('READY', style: AppTypography.label(color: AppColors.success)),
-          const SizedBox(height: AppSpacing.md),
-          Text('Your phone is yours.\nYour rules are ready.',
-              textAlign: TextAlign.center,
-              style: AppTypography.section()),
+          Container(
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withValues(alpha: 0.12),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+            ),
+            child: const Icon(Icons.self_improvement,
+                size: 40, color: AppColors.primary),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          Text('No Active Session', style: AppTypography.section()),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Choose a mode and start your journey to a better you.',
+            textAlign: TextAlign.center,
+            style: AppTypography.body(color: AppColors.textSecondary),
+          ),
           const SizedBox(height: AppSpacing.xxl),
           Row(
             children: [
@@ -325,109 +475,8 @@ class _HeroStatus extends StatelessWidget {
   }
 }
 
-/// v2.1 Phase C: compact level + streak strip; taps into the Progress hub.
-/// Hidden entirely when the progress layer is disabled.
-class _ProgressStrip extends StatelessWidget {
-  const _ProgressStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = AppStateScope.of(context).state.progress;
-    if (progress == null || !progress.enabled) return const SizedBox.shrink();
-
-    return InkWell(
-      onTap: () => Navigator.of(context).pushNamed(AppConstants.routeProgress),
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      child: MLDCard(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.primary, AppColors.premium],
-                ),
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-              ),
-              child: const Icon(Icons.terrain_outlined,
-                  color: AppColors.onPrimary, size: 22),
-            ),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    progress.levelName.isEmpty ? 'LEVEL ${progress.level}' : progress.levelName,
-                    style: AppTypography.heading(),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${progress.dp} DP · ${progress.streakDays}-day streak',
-                    style: AppTypography.caption(),
-                  ),
-                ],
-              ),
-            ),
-            if (progress.frozen)
-              const Icon(Icons.ac_unit, size: 18, color: AppColors.info)
-            else if (progress.checkInAvailable)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-                decoration: BoxDecoration(
-                  // v2.5.5 audit fix: withOpacity is deprecated (Flutter 3.27+).
-                  color: AppColors.success.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppRadii.sm),
-                ),
-                child: Text('CHECK-IN READY',
-                    style: AppTypography.label(color: AppColors.success)),
-              )
-            else
-              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TodayProgress extends StatelessWidget {
-  const _TodayProgress();
-
-  @override
-  Widget build(BuildContext context) {
-    final app = AppStateScope.of(context);
-    final shortsCount = app.state.shorts.warningCount;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        MLDSectionHeader(title: "TODAY'S PROGRESS"),
-        Row(
-          children: [
-            const Expanded(child: MLDStatTile(label: 'Focus', value: '—')),
-            const SizedBox(width: AppSpacing.md),
-            const Expanded(child: MLDStatTile(label: 'Detox', value: '—')),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: MLDStatTile(
-                label: 'Shorts attempts',
-                value: '$shortsCount',
-                accent: AppColors.warning,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
+/// Quick Actions (mockup Screen 25): the six enforcement modes, each in its
+/// signature accent — the heart of the v2.6 reference design.
 class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
@@ -437,7 +486,76 @@ class _QuickActions extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         MLDSectionHeader(title: 'QUICK ACTIONS'),
-        _action(
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: AppSpacing.md,
+          crossAxisSpacing: AppSpacing.md,
+          childAspectRatio: 1.28,
+          children: [
+            MLDModeTile(
+              icon: Icons.menu_book_outlined,
+              title: 'Study Mode',
+              subtitle: 'Focus & Learn',
+              accent: AppColors.study,
+              onTap: () => Navigator.of(context).pushNamed(AppConstants.routeStudySetup),
+            ),
+            MLDModeTile(
+              icon: Icons.spa_outlined,
+              title: 'Detox Mode',
+              subtitle: 'Full Digital Detox',
+              accent: AppColors.detox,
+              onTap: () => Navigator.of(context).pushNamed(AppConstants.routeDetoxSetup),
+            ),
+            MLDModeTile(
+              icon: Icons.self_improvement,
+              title: 'Monk Mode',
+              subtitle: 'No Distractions',
+              accent: AppColors.monk,
+              onTap: () => Navigator.of(context).pushNamed(AppConstants.routeMonk),
+            ),
+            MLDModeTile(
+              icon: Icons.phonelink_lock,
+              title: 'Lock Phone',
+              subtitle: 'Full Lock',
+              accent: AppColors.lock,
+              onTap: () => Navigator.of(context).pushNamed(AppConstants.routeLockMyPhone),
+            ),
+            MLDModeTile(
+              icon: Icons.pause_circle_outline,
+              title: 'Safety Pause',
+              subtitle: 'Think & Continue',
+              accent: AppColors.safety,
+              onTap: () => Navigator.of(context).pushNamed(AppConstants.routeSafety),
+            ),
+            MLDModeTile(
+              icon: Icons.military_tech,
+              title: 'Prime Commit',
+              subtitle: 'Ultimate Focus',
+              accent: AppColors.prime,
+              onTap: () => Navigator.of(context).pushNamed(AppConstants.routePrime),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Secondary tools — every entry point that existed on the old home stays
+/// reachable; the modes grid above is the primary surface, this list keeps
+/// the rest one tap away.
+class _MoreTools extends StatelessWidget {
+  const _MoreTools();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        MLDSectionHeader(title: 'MORE TOOLS'),
+        _tool(
           context,
           icon: Icons.block_outlined,
           title: 'Shorts Blocker',
@@ -445,7 +563,7 @@ class _QuickActions extends StatelessWidget {
           onTap: () => Navigator.of(context).pushNamed(AppConstants.routeShortsSettings),
         ),
         const SizedBox(height: AppSpacing.md),
-        _action(
+        _tool(
           context,
           icon: Icons.alarm,
           title: 'Shockwave Alarm',
@@ -453,7 +571,7 @@ class _QuickActions extends StatelessWidget {
           onTap: () => Navigator.of(context).pushNamed(AppConstants.routeAlarmSetup),
         ),
         const SizedBox(height: AppSpacing.md),
-        _action(
+        _tool(
           context,
           icon: Icons.monetization_on_outlined,
           title: 'Coins',
@@ -462,7 +580,7 @@ class _QuickActions extends StatelessWidget {
           onTap: () => Navigator.of(context).pushNamed(AppConstants.routeCoins),
         ),
         const SizedBox(height: AppSpacing.md),
-        _action(
+        _tool(
           context,
           icon: Icons.history,
           title: 'History',
@@ -470,7 +588,7 @@ class _QuickActions extends StatelessWidget {
           onTap: () => Navigator.of(context).pushNamed(AppConstants.routeHistory),
         ),
         const SizedBox(height: AppSpacing.md),
-        _action(
+        _tool(
           context,
           icon: Icons.favorite_outline,
           title: 'Sinthia',
@@ -478,7 +596,7 @@ class _QuickActions extends StatelessWidget {
           onTap: () => Navigator.of(context).pushNamed(AppConstants.routeCompanion),
         ),
         const SizedBox(height: AppSpacing.md),
-        _action(
+        _tool(
           context,
           icon: Icons.checklist,
           title: 'Tasks & Routines',
@@ -486,43 +604,18 @@ class _QuickActions extends StatelessWidget {
           onTap: () => Navigator.of(context).pushNamed(AppConstants.routeTasks),
         ),
         const SizedBox(height: AppSpacing.md),
-        _action(
+        _tool(
           context,
           icon: Icons.group_outlined,
           title: 'Community',
           subtitle: 'Public commits, friends, referral',
           onTap: () => Navigator.of(context).pushNamed(AppConstants.routeCommunity),
         ),
-        const SizedBox(height: AppSpacing.xxl),
-        MLDSectionHeader(title: 'HARD MODES'),
-        _action(
-          context,
-          icon: Icons.phonelink_lock,
-          title: 'Lock My Phone',
-          subtitle: 'Full device lockdown · no exit but time',
-          onTap: () => Navigator.of(context).pushNamed(AppConstants.routeLockMyPhone),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _action(
-          context,
-          icon: Icons.self_improvement,
-          title: 'Monk Mode',
-          subtitle: 'Allowlist-only discipline window',
-          onTap: () => Navigator.of(context).pushNamed(AppConstants.routeMonk),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _action(
-          context,
-          icon: Icons.military_tech,
-          title: 'Prime Commit',
-          subtitle: 'All-or-nothing contract · TOTP exit',
-          onTap: () => Navigator.of(context).pushNamed(AppConstants.routePrime),
-        ),
       ],
     );
   }
 
-  Widget _action(
+  Widget _tool(
     BuildContext context, {
     required IconData icon,
     required String title,
@@ -569,30 +662,30 @@ class _QuickActions extends StatelessWidget {
 // Tab pages (lightweight wrappers around full feature screens)
 // ---------------------------------------------------------------------------
 
-class _FocusTabPage extends StatelessWidget {
-  const _FocusTabPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const StudySetupScreenRef();
-  }
-}
-
-class _DetoxTabPage extends StatelessWidget {
-  const _DetoxTabPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const DetoxSetupScreenRef();
-  }
-}
-
 class _InsightsTabPage extends StatelessWidget {
   const _InsightsTabPage();
 
   @override
   Widget build(BuildContext context) {
     return const InsightsScreenRef();
+  }
+}
+
+class _CommunityTabPage extends StatelessWidget {
+  const _CommunityTabPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const CommunityScreen();
+  }
+}
+
+class _TasksTabPage extends StatelessWidget {
+  const _TasksTabPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const TasksScreen();
   }
 }
 
