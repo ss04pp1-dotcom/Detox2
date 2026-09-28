@@ -106,12 +106,7 @@ class _AccountScreenState extends State<AccountScreen> {
     setState(() => _busy = true);
     await ApiClient.instance.logout();
     if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _sub = null;
-      _trial = null;
-    });
-    _load();
+    Navigator.of(context).pushNamedAndRemoveUntil(AppConstants.routeAuth, (route) => false);
   }
 
   /// Days left in an active trial (never below zero), or null when there is

@@ -344,6 +344,7 @@ export interface UserRow {
   email: string;
   display_name: string | null;
   status: string;
+  password_hash?: string | null;
   /** Not selected by list queries; toApiUser never reads it. */
   google_sub?: string | null;
   /** v2.5.7 (004): deterministic referral code (set lazily by GET /referral). */

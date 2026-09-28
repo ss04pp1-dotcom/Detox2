@@ -10,6 +10,7 @@ abstract final class AppConstants {
 
   // --- Navigation route names ---
   static const String routeSplash = '/';
+  static const String routeAuth = '/auth';
   static const String routeOnboarding = '/onboarding';
   static const String routePact = '/onboarding/pact';
   static const String routePermissions = '/permissions';

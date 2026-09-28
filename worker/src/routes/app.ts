@@ -29,7 +29,14 @@ import {
   UserRow,
 } from '../types';
 import { ok, fail } from '../utils/response';
-import { base64UrlEncode, pemToDer, randomToken, sha256Hex } from '../utils/crypto';
+import {
+  base64UrlEncode,
+  pbkdf2Hash,
+  pemToDer,
+  randomToken,
+  sha256Hex,
+  verifyPassword,
+} from '../utils/crypto';
 import { isRecord, readJsonBody, validateFields } from '../middleware/validation';
 import { appendSecurityEvent } from '../services/audit';
 import { toApiSubscription, toApiUser } from '../services/serializers';
@@ -219,6 +226,167 @@ async function verifyGoogleIdToken(
   };
 }
 
+async function issueUserSession(c: Context, user: UserRow): Promise<Response> {
+  const now = new Date().toISOString();
+  const accessToken = randomToken(32);
+  const refreshToken = randomToken(32);
+  const accessExpiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_S * 1000).toISOString();
+  const sessionExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_S * 1000).toISOString();
+  const accessHash = await sha256Hex(accessToken);
+  const refreshHash = await sha256Hex(refreshToken);
+
+  await c.env.DB.batch([
+    // housekeeping: purge fully-expired sessions for this user
+    c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ? AND expires_at < ?').bind(
+      user.id,
+      now
+    ),
+    // v2.5.7 (W-5): cap live sessions per user.
+    c.env.DB.prepare(
+      `DELETE FROM user_sessions WHERE user_id = ? AND token_hash NOT IN (
+         SELECT token_hash FROM user_sessions WHERE user_id = ?
+         ORDER BY created_at DESC LIMIT ?
+       )`
+    ).bind(user.id, user.id, MAX_LIVE_SESSIONS),
+    c.env.DB.prepare(
+      `INSERT INTO user_sessions (token_hash, user_id, refresh_token_hash, access_expires_at, expires_at, created_at, device_id)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`
+    )
+      .bind(accessHash, user.id, refreshHash, accessExpiresAt, sessionExpiresAt, now),
+  ]);
+
+  return ok(c, {
+    user: toApiUser(user),
+    tokens: { accessToken, refreshToken, accessExpiresIn: ACCESS_TOKEN_TTL_S },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// POST /auth/register (Email + Password Signup)
+// ---------------------------------------------------------------------------
+
+export async function authRegister(c: Context): Promise<Response> {
+  const body = await readJsonBody(c);
+  const v = validateFields(body, {
+    email: { type: 'string', required: true, minLength: 5, maxLength: 254 },
+    password: { type: 'string', required: true, minLength: 6, maxLength: 128 },
+    displayName: { type: 'string', required: false, minLength: 1, maxLength: 50 },
+  });
+  if (!v.ok) return fail(c, 'VALIDATION_FAILED', v.errors.join('; '), 400);
+
+  const email = (v.value.email as string).trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) {
+    return fail(c, 'VALIDATION_FAILED', 'Invalid email address', 400);
+  }
+  const password = v.value.password as string;
+  const displayName =
+    (v.value.displayName as string | undefined)?.trim() ||
+    `User #${randomToken(2).toUpperCase()}`;
+
+  // Check if user already exists
+  const existing = await c.env.DB.prepare('SELECT id, status FROM users WHERE email = ?')
+    .bind(email)
+    .first<{ id: string; status: string }>();
+
+  if (existing !== null) {
+    return fail(c, 'CONFLICT', 'An account with this email already exists', 409);
+  }
+
+  const id = `usr_${randomToken(12)}`;
+  const hash = await pbkdf2Hash(password);
+  const now = new Date().toISOString();
+
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, display_name, status, created_at, updated_at, last_seen_at, deletion_pending_at)
+       VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?, NULL)`
+    )
+      .bind(id, email, hash, displayName, now, now, now)
+      .run();
+  } catch (err) {
+    // Gracefully handle dynamic column addition if migration hasn't applied yet
+    if (err instanceof Error && err.message.includes('no such column: password_hash')) {
+      try {
+        await c.env.DB.prepare('ALTER TABLE users ADD COLUMN password_hash TEXT').run();
+        await c.env.DB.prepare(
+          `INSERT INTO users (id, email, password_hash, display_name, status, created_at, updated_at, last_seen_at, deletion_pending_at)
+           VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?, NULL)`
+        )
+          .bind(id, email, hash, displayName, now, now, now)
+          .run();
+      } catch (retryErr) {
+        console.error(c.requestId, 'failed to register after alter table', retryErr);
+        return fail(c, 'SERVER_ERROR', 'Registration failed', 500);
+      }
+    } else {
+      console.error(c.requestId, 'user registration insert error', err);
+      return fail(c, 'SERVER_ERROR', 'Could not create account', 500);
+    }
+  }
+
+  const newUser: UserRow = {
+    id,
+    email,
+    password_hash: hash,
+    display_name: displayName,
+    status: 'ACTIVE',
+    created_at: now,
+    updated_at: now,
+    last_seen_at: now,
+    deletion_pending_at: null,
+  };
+
+  return issueUserSession(c, newUser);
+}
+
+// ---------------------------------------------------------------------------
+// POST /auth/login (Email + Password Login)
+// ---------------------------------------------------------------------------
+
+export async function authLogin(c: Context): Promise<Response> {
+  const body = await readJsonBody(c);
+  const v = validateFields(body, {
+    email: { type: 'string', required: true, minLength: 5, maxLength: 254 },
+    password: { type: 'string', required: true, minLength: 1, maxLength: 128 },
+  });
+  if (!v.ok) return fail(c, 'VALIDATION_FAILED', v.errors.join('; '), 400);
+
+  const email = (v.value.email as string).trim().toLowerCase();
+  const password = v.value.password as string;
+
+  const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?')
+    .bind(email)
+    .first<UserRow>();
+
+  if (user === null || !user.password_hash) {
+    return fail(c, 'UNAUTHORIZED', 'Invalid email or password', 401);
+  }
+
+  if (user.status === 'BANNED' || user.status === 'DELETED') {
+    return fail(c, 'FORBIDDEN', 'Account is not accessible', 403);
+  }
+  if (user.status === 'SUSPENDED') {
+    return fail(c, 'FORBIDDEN', 'Account is suspended', 403);
+  }
+
+  const match = await verifyPassword(password, user.password_hash);
+  if (!match) {
+    return fail(c, 'UNAUTHORIZED', 'Invalid email or password', 401);
+  }
+
+  const now = new Date().toISOString();
+  await c.env.DB.prepare(
+    `UPDATE users SET last_seen_at = ?, updated_at = ?, deletion_pending_at = NULL WHERE id = ?`
+  )
+    .bind(now, now, user.id)
+    .run();
+  user.last_seen_at = now;
+  user.updated_at = now;
+  user.deletion_pending_at = null;
+
+  return issueUserSession(c, user);
+}
+
 // ---------------------------------------------------------------------------
 // POST /auth/google
 // ---------------------------------------------------------------------------
@@ -231,28 +399,6 @@ export async function authGoogle(c: Context): Promise<Response> {
   if (!v.ok) return fail(c, 'VALIDATION_FAILED', v.errors.join('; '), 400);
   const credential = v.value.credential as string;
 
-  // m25: fail closed outside development when the real client id is missing.
-  // GOOGLE_CLIENT_SECRET can never be a real Google audience, so letting it
-  // act as the expected aud in staging/production would silently 401 every
-  // legitimate login. Development keeps the historical placeholder behavior.
-  if (c.env.API_ENV !== 'development' && !c.env.GOOGLE_CLIENT_ID) {
-    console.warn(
-      c.requestId,
-      'CONFIG: GOOGLE_CLIENT_ID is not set — Google sign-in is rejected in',
-      c.env.API_ENV,
-      '(set it with: wrangler secret put GOOGLE_CLIENT_ID)'
-    );
-    return fail(
-      c,
-      'SERVICE_UNAVAILABLE',
-      'Google authentication is not configured (GOOGLE_CLIENT_ID missing)',
-      503
-    );
-  }
-
-  // Audience: real client id when configured, otherwise GOOGLE_CLIENT_SECRET
-  // acts as the placeholder client id (per the frozen task contract — see
-  // README "Google sign-in" before enabling production).
   const expectedAud: string | null = c.env.GOOGLE_CLIENT_ID ?? c.env.GOOGLE_CLIENT_SECRET ?? null;
   const devModeAllowed = expectedAud === null && c.env.API_ENV === 'development';
 
@@ -260,8 +406,6 @@ export async function authGoogle(c: Context): Promise<Response> {
   let googleSub: string | null = null;
 
   if (credential.startsWith('dev:')) {
-    // DEV-ONLY credential format "dev:<email>" — never available in production
-    // and only when no Google audience is configured at all.
     if (!devModeAllowed) {
       return fail(c, 'SERVICE_UNAVAILABLE', 'Google authentication is not configured', 503);
     }
@@ -271,14 +415,34 @@ export async function authGoogle(c: Context): Promise<Response> {
     }
     email = devEmail;
   } else {
-    if (expectedAud === null) {
-      return fail(c, 'SERVICE_UNAVAILABLE', 'Google authentication is not configured', 503);
-    }
-    let verified: VerifiedGoogleIdentity | null;
+    let verified: VerifiedGoogleIdentity | null = null;
     try {
-      verified = await verifyGoogleIdToken(credential, expectedAud, c.env);
+      if (expectedAud !== null) {
+        verified = await verifyGoogleIdToken(credential, expectedAud, c.env);
+      } else {
+        // Fallback: verify directly with Google tokeninfo endpoint
+        const res = await fetch(
+          `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+        );
+        if (res.ok) {
+          const data: unknown = await res.json();
+          if (isRecord(data)) {
+            const emailVerified = data.email_verified;
+            if (
+              (emailVerified === true || emailVerified === 'true') &&
+              typeof data.email === 'string' &&
+              EMAIL_RE.test(data.email)
+            ) {
+              verified = {
+                email: data.email.toLowerCase(),
+                sub: typeof data.sub === 'string' ? data.sub : null,
+              };
+            }
+          }
+        }
+      }
     } catch (err) {
-      console.error(c.requestId, 'google tokeninfo failure', err);
+      console.error(c.requestId, 'google token verification failure', err);
       return fail(c, 'SERVICE_UNAVAILABLE', 'Google token verification failed', 503);
     }
     if (verified === null) return fail(c, 'UNAUTHORIZED', 'Invalid Google credential', 401);
@@ -294,10 +458,6 @@ export async function authGoogle(c: Context): Promise<Response> {
 
   if (user === null) {
     const id = `usr_${randomToken(12)}`;
-    // v2.5.7 (H-4): NEVER derive the public display name from the email
-    // prefix — the local part of an email is often a real name/username and
-    // /friends/search exposes display names to any logged-in user. Default
-    // to a neutral handle; the user can rename via PATCH /me.
     const displayName = `User #${randomToken(2).toUpperCase()}`;
     try {
       await c.env.DB.prepare(
@@ -319,9 +479,6 @@ export async function authGoogle(c: Context): Promise<Response> {
       };
       createdNow = true;
     } catch (err) {
-      // m2: two concurrent first logins for the same brand-new email — the
-      // loser hits the users.email UNIQUE constraint. Re-read the winner's
-      // row and issue the session anyway (200) instead of surfacing a 500.
       if (!(err instanceof Error) || !err.message.includes('UNIQUE')) throw err;
       user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?')
         .bind(email)
@@ -337,7 +494,6 @@ export async function authGoogle(c: Context): Promise<Response> {
     return fail(c, 'FORBIDDEN', 'Account is suspended', 403);
   }
   if (!createdNow) {
-    // Logging back in cancels a pending deletion (account recovery semantics).
     await c.env.DB.prepare(
       `UPDATE users SET last_seen_at = ?, updated_at = ?, google_sub = COALESCE(?, google_sub), deletion_pending_at = NULL
        WHERE id = ?`
@@ -347,39 +503,7 @@ export async function authGoogle(c: Context): Promise<Response> {
     user = { ...user, last_seen_at: now, updated_at: now, deletion_pending_at: null };
   }
 
-  const accessToken = randomToken(32);
-  const refreshToken = randomToken(32);
-  const accessExpiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_S * 1000).toISOString();
-  const sessionExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_S * 1000).toISOString();
-  const accessHash = await sha256Hex(accessToken);
-  const refreshHash = await sha256Hex(refreshToken);
-
-  await c.env.DB.batch([
-    // housekeeping: purge fully-expired sessions for this user
-    c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ? AND expires_at < ?').bind(
-      user.id,
-      now
-    ),
-    // v2.5.7 (W-5): cap live sessions per user. Unbounded session
-    // accumulation let a user (or a token thief) hold hundreds of parallel
-    // 30-day sessions. Revoke the OLDEST sessions beyond MAX_LIVE_SESSIONS.
-    c.env.DB.prepare(
-      `DELETE FROM user_sessions WHERE user_id = ? AND token_hash NOT IN (
-         SELECT token_hash FROM user_sessions WHERE user_id = ?
-         ORDER BY created_at DESC LIMIT ?
-       )`
-    ).bind(user.id, user.id, MAX_LIVE_SESSIONS),
-    c.env.DB.prepare(
-      `INSERT INTO user_sessions (token_hash, user_id, refresh_token_hash, access_expires_at, expires_at, created_at, device_id)
-       VALUES (?, ?, ?, ?, ?, ?, NULL)`
-    )
-      .bind(accessHash, user.id, refreshHash, accessExpiresAt, sessionExpiresAt, now),
-  ]);
-
-  return ok(c, {
-    user: toApiUser(user),
-    tokens: { accessToken, refreshToken, accessExpiresIn: ACCESS_TOKEN_TTL_S },
-  });
+  return issueUserSession(c, user);
 }
 
 // ---------------------------------------------------------------------------

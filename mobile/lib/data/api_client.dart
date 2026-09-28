@@ -63,23 +63,49 @@ class ApiClient {
   Map<String, bool> featureFlags = {};
 
   // ---------------------------------------------------------------------
-  // Auth (Google Sign-In credential -> Worker session)
+  // Auth (Email/Password & Google Sign-In -> Worker session)
   // ---------------------------------------------------------------------
+
+  Future<bool> registerWithEmail(String email, String password, {String? displayName}) async {
+    clearLastError();
+    final body = <String, dynamic>{
+      'email': email.trim().toLowerCase(),
+      'password': password,
+    };
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      body['displayName'] = displayName.trim();
+    }
+    final res = await _post('/auth/register', body, authenticated: false);
+    if (res == null) return false;
+    return _handleAuthResponse(res);
+  }
+
+  Future<bool> loginWithEmail(String email, String password) async {
+    clearLastError();
+    final body = <String, dynamic>{
+      'email': email.trim().toLowerCase(),
+      'password': password,
+    };
+    final res = await _post('/auth/login', body, authenticated: false);
+    if (res == null) return false;
+    return _handleAuthResponse(res);
+  }
 
   Future<bool> loginWithGoogle(String idToken) async {
     clearLastError();
     final res = await _post('/auth/google', {'credential': idToken}, authenticated: false);
     if (res == null) return false;
+    return _handleAuthResponse(res);
+  }
+
+  bool _handleAuthResponse(Map<String, dynamic> res) {
     final tokens = res['tokens'] as Map<dynamic, dynamic>?;
     if (tokens == null) return false;
     _accessToken = tokens['accessToken'] as String?;
     _refreshToken = tokens['refreshToken'] as String?;
-    // v2.5.7 (W-7): remember the user id — BillingManager binds it into the
-    // purchase as obfuscatedExternalAccountId so the Worker can verify the
-    // purchase belongs to this account.
     final user = res['user'] as Map<dynamic, dynamic>?;
     _userId = user?['id'] as String?;
-    await _persistSession();
+    unawaited(_persistSession());
     return _accessToken != null;
   }
 

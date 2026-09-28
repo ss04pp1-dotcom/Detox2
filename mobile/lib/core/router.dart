@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'constants.dart';
 import '../features/account/account_screen.dart';
+import '../features/auth/auth_screen.dart';
 import '../features/companion/companion_screen.dart';
 import '../features/community/community_screen.dart';
 import '../features/emergency_codes/emergency_codes_screen.dart';
@@ -43,6 +44,7 @@ import '../main.dart';
 Map<String, WidgetBuilder> buildAppRoutes() {
   return {
     AppConstants.routeSplash: (_) => const SplashScreen(),
+    AppConstants.routeAuth: (_) => const AuthScreen(),
     AppConstants.routeOnboarding: (_) => const OnboardingScreen(),
     AppConstants.routePact: (_) => const PactScreen(),
     AppConstants.routePermissions: (_) => const PermissionSetupScreen(),

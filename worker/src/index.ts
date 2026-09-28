@@ -19,6 +19,8 @@ import { appendSecurityEvent } from './services/audit';
 
 import {
   authGoogle,
+  authRegister,
+  authLogin,
   authRefresh,
   authLogout,
   getMe,
@@ -161,6 +163,8 @@ function route(method: string, path: string, middlewares: Middleware[], handler:
 
 const APP_ROUTES: Route[] = [
   route('POST', '/auth/google', [rateLimit('auth', 'ip')], authGoogle),
+  route('POST', '/auth/register', [rateLimit('auth', 'ip')], authRegister),
+  route('POST', '/auth/login', [rateLimit('auth', 'ip')], authLogin),
   route('POST', '/auth/refresh', [rateLimit('auth', 'ip')], authRefresh),
   // M1: requireUser must run before authLogout — without it the handler
   // always answered 401 and the server-side session was never revoked.

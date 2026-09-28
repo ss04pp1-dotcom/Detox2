@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   id                  TEXT PRIMARY KEY,
   email               TEXT NOT NULL UNIQUE,
   display_name        TEXT,
+  password_hash       TEXT,
   status              TEXT NOT NULL DEFAULT 'ACTIVE'
                       CHECK (status IN ('ACTIVE', 'SUSPENDED', 'BANNED', 'DELETED')),
   google_sub          TEXT,

@@ -491,7 +491,9 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
     final s = state.state;
     String target = AppConstants.routeShell;
-    if (!s.onboardingComplete) {
+    if (!ApiClient.instance.isAuthenticated) {
+      target = AppConstants.routeAuth;
+    } else if (!s.onboardingComplete) {
       target = AppConstants.routeOnboarding;
     } else if (!s.pactAccepted) {
       target = AppConstants.routePact;
