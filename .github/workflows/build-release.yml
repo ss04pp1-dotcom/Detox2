@@ -6,7 +6,7 @@ on:
       api_base_url:
         description: 'MLD API Base URL'
         required: false
-        default: 'https://api.maxleveldetox.com/api/v1'
+        default: 'https://mld-api.salman61902.workers.dev/api/v1'
       admob_app_id:
         description: 'AdMob App ID (leave empty for default test ID)'
         required: false
@@ -84,7 +84,7 @@ jobs:
           FLAGS=""
           
           # API Base URL
-          API_URL="${{ github.event.inputs.api_base_url || secrets.MLD_API_BASE || 'https://api.maxleveldetox.com/api/v1' }}"
+          API_URL="${{ github.event.inputs.api_base_url || secrets.MLD_API_BASE || 'https://mld-api.salman61902.workers.dev/api/v1' }}"
           FLAGS="$FLAGS --dart-define=MLD_API_BASE=$API_URL"
           
           # Google Client ID
