@@ -37,17 +37,36 @@ class _CommunityScreenState extends State<CommunityScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Community'),
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: const [
-            Tab(text: 'Commits'),
-            Tab(text: 'Friends'),
-            Tab(text: 'Referral'),
-            Tab(text: 'Leaderboard'),
-          ],
+        title: const MLDAppBarTitle(title: 'Community'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(50),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.edge),
+            ),
+            child: TabBar(
+              controller: _tabs,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              labelColor: Colors.white,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              dividerColor: Colors.transparent,
+              tabs: const [
+                Tab(text: 'Commits'),
+                Tab(text: 'Friends'),
+                Tab(text: 'Referral'),
+                Tab(text: 'Leaderboard'),
+              ],
+            ),
+          ),
         ),
       ),
       body: SafeArea(
@@ -208,15 +227,57 @@ class _CommitsTabState extends State<_CommitsTab> {
               ? const Center(child: CircularProgressIndicator())
               : _commits.isEmpty
                   ? ListView(
-                      children: const [
-                        SizedBox(height: 120),
-                        Center(
-                          child: Text(
-                              'No active commitments yet.\n'
-                              'Be the first to go public — or you may be '
-                              'offline.\nPull to retry.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: AppColors.textSecondary)),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(28),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.edge),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.campaign_outlined,
+                                  size: 38,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              const Text(
+                                'No Public Commitments Yet',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Declare your goals publicly and let the community hold you accountable. Tap below to make your first commitment.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              FilledButton.icon(
+                                icon: const Icon(Icons.add, size: 18),
+                                label: const Text('Post New Commitment'),
+                                onPressed: _create,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     )

@@ -99,10 +99,28 @@ class _InsightsScreenState extends State<InsightsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('YOUR WEEK', style: AppTypography.heading()),
-          const SizedBox(height: AppSpacing.sm),
-          Text('Am I actually improving?', style: AppTypography.caption()),
-          const SizedBox(height: AppSpacing.xxl),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.analytics_outlined, color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('WEEKLY INSIGHTS', style: AppTypography.heading()),
+                  const SizedBox(height: 2),
+                  Text('Am I actually improving?', style: AppTypography.caption()),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
 
           Row(
             children: [
@@ -441,7 +459,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       ),
     );
 
-    if (widget.embedded) return body;
+    if (widget.embedded) return SafeArea(child: body);
     return Scaffold(
       appBar: AppBar(title: const MLDAppBarTitle(title: 'Insights')),
       body: SafeArea(child: body),

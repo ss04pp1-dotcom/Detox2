@@ -160,34 +160,50 @@ class _WidgetsScreenState extends State<WidgetsScreen> {
     required String title,
     required String subtitle,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: MLDCard(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.primary, size: 26),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
-                ],
-              ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppColors.edge),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
             ),
-            MLDButton(
-              label: 'Pin',
-              expanded: false,
-              loading: _busy,
-              onPressed: () => _pin(which),
+            child: Icon(icon, color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12)),
+              ],
             ),
-          ],
-        ),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+              minimumSize: const Size(0, 36),
+            ),
+            icon: const Icon(Icons.push_pin, size: 14),
+            label: const Text('Pin',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            onPressed: _busy ? null : () => _pin(which),
+          ),
+        ],
       ),
     );
   }

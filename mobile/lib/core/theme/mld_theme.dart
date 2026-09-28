@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'tokens.dart';
 
@@ -12,6 +13,7 @@ ThemeData buildMldTheme() {
   final base = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    fontFamily: GoogleFonts.inter().fontFamily,
     colorScheme: const ColorScheme.dark(
       primary: AppColors.primary,
       onPrimary: AppColors.onPrimary,
@@ -162,7 +164,7 @@ ThemeData buildMldTheme() {
       linearTrackColor: AppColors.elevated,
       circularTrackColor: AppColors.elevated,
     ),
-    textTheme: const TextTheme(
+    textTheme: GoogleFonts.interTextTheme(const TextTheme(
       bodyLarge: TextStyle(color: AppColors.textPrimary, fontSize: 16, height: 1.45),
       bodyMedium: TextStyle(color: AppColors.textPrimary, fontSize: 15, height: 1.5),
       bodySmall: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
@@ -170,7 +172,7 @@ ThemeData buildMldTheme() {
       titleMedium: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
       titleSmall: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w700),
       labelLarge: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w800),
-    ),
+    )),
     dividerTheme: const DividerThemeData(color: AppColors.edge, thickness: 1, space: 1),
     switchTheme: SwitchThemeData(
       trackColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? AppColors.primary.withValues(alpha: .48) : AppColors.elevated),

@@ -189,10 +189,11 @@ object TasksEngine {
                 val dk = dateKey(t.optLong("completedAt", 0L))
                 if (dk == today) doneToday++
             } else open++
-            if (t.getBoolean("routine")) routines++
-            val subs = t.getJSONArray("subtasks")
+            if (t.optBoolean("routine", false)) routines++
+            val subs = t.optJSONArray("subtasks") ?: JSONArray()
             for (j in 0 until subs.length()) {
-                if (!subs.getJSONObject(j).getBoolean("done")) subtasksOpen++
+                val sub = subs.optJSONObject(j) ?: continue
+                if (!sub.optBoolean("done", false)) subtasksOpen++
             }
         }
         return JSONObject().apply {
@@ -215,7 +216,7 @@ object TasksEngine {
         var changed = false
         for (i in 0 until arr.length()) {
             val t = arr.getJSONObject(i)
-            if (!t.getBoolean("routine")) continue
+            if (!t.optBoolean("routine", false)) continue
             if (t.isNull("completedAt")) continue
             if (dateKey(t.optLong("completedAt", 0L)) == today) continue
             t.put("completedAt", JSONObject.NULL)
