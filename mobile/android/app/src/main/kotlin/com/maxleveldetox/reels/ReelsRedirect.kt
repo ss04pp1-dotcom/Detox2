@@ -80,7 +80,7 @@ object ReelsRedirect {
 
     /** Platforms with no safe in-app surface — HOME (or the caller's own
      *  fallback) is correct for these. */
-    private val NO_SAFE_SURFACE = setOf(
+    val NO_SAFE_SURFACE = setOf(
         DetectionRules.PKG_TIKTOK,
         DetectionRules.PKG_TIKTOK_REGIONAL,
         DetectionRules.PKG_CHROME,
@@ -104,15 +104,17 @@ object ReelsRedirect {
      */
     fun navigateFromService(service: AccessibilityService, pkg: String): Boolean {
         if (pkg in NO_SAFE_SURFACE) return false
-        return when (advanceRung(pkg)) {
-            1 -> tryBackPress(service) ||
-                tryClickHomeTab(service, pkg) ||
-                tryRevisitRoot(service, pkg)
-            2 -> tryClickHomeTab(service, pkg) ||
-                tryRevisitRoot(service, pkg)
-            3 -> tryRevisitRoot(service, pkg)
-            else -> false
-        }
+
+        // 1. BACK press: immediately pops the fullscreen reel/shorts viewer back to Feed/Home
+        if (tryBackPress(service)) return true
+
+        // 2. Click Home/Feed bottom-nav tab in the app
+        if (tryClickHomeTab(service, pkg)) return true
+
+        // 3. Revisit root activity with CLEAR_TOP (stays inside app)
+        if (tryRevisitRoot(service, pkg)) return true
+
+        return false
     }
 
     /**

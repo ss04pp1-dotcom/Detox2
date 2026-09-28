@@ -120,37 +120,81 @@ object DetectionRules {
     val COMPILED_DEFAULTS: Map<String, PlatformRule> = mapOf(
         "youtube" to PlatformRule(
             enabled = true,
-            feedViewIds = listOf("reel_watch_fragment_root"),
+            feedViewIds = listOf(
+                "reel_watch_fragment_root",
+                "reel_player_page_tree",
+                "shorts_container",
+                "reel_recycler",
+                "reel_player",
+                "reel_watch_fragment",
+                "shorts_player",
+            ),
             immersiveViewIds = listOf("pivot_bar"),
-            // v2.9 r16: Shorts is a dedicated activity in current YouTube
-            // builds (com.google.android.youtube.shorts.ShortsActivity) —
-            // the class name survives UI redesigns that rename view ids.
-            activityHints = listOf("shortsactivity"),
+            activityHints = listOf(
+                "shortsactivity",
+                "reelwatchactivity",
+                "shorts",
+            ),
         ),
         "tiktok" to PlatformRule(enabled = true),
         "facebook" to PlatformRule(
             enabled = true,
-            eventTextHints = listOf("Reel details", "Reels tab details"),
-            reelDetailsHints = listOf("Reel details", "Reels tab details"),
-            navHints = listOf("Navigate to your Reels profile"),
+            feedViewIds = listOf(
+                "fb_shorts_container",
+                "reel_viewer",
+                "reels_viewer_container",
+                "unified_reels_player",
+                "fb_shorts_player",
+                "fb_shorts_unified_viewer",
+            ),
+            eventTextHints = listOf(
+                "Reel details",
+                "Reels tab details",
+                "Watch more Reels",
+                "Remix Reel",
+                "Original audio",
+            ),
+            reelDetailsHints = listOf(
+                "Reel details",
+                "Reels tab details",
+                "Watch more Reels",
+                "Remix Reel",
+                "Original audio",
+            ),
+            navHints = listOf("Navigate to your Reels profile", "Reels"),
             reelsHints = listOf("Reels"),
             fullscreenHints = listOf("Fullscreen"),
-            // v2.9 r16: the fullscreen reels player is its own activity —
-            // instant detection on window-state change, no tree walk.
-            activityHints = listOf("reelsactivity", "reelactivity"),
+            activityHints = listOf(
+                "reelsactivity",
+                "reelactivity",
+                "reelsvieweractivity",
+                "fbshortsvieweractivity",
+                "fbshortsactivity",
+                "fbshortsunifiedvieweractivity",
+            ),
         ),
         "facebook_lite" to PlatformRule(
             enabled = true,
-            feedViewIds = listOf("video_view"),
+            feedViewIds = listOf("video_view", "reel_viewer"),
             immersiveGate = true,
             activityHints = listOf("reelsactivity", "reelactivity"),
         ),
         "instagram" to PlatformRule(
             enabled = true,
-            feedViewIds = listOf("root_clips_layout"),
+            feedViewIds = listOf(
+                "root_clips_layout",
+                "clips_viewer_video_container",
+                "reel_viewer",
+                "clips_video_container",
+                "clips_swipe_refresh_layout",
+            ),
             liteFeedViewIds = listOf("clips_viewer_video_container"),
             sharedFeedViewIds = listOf("reel_recycler"),
-            activityHints = listOf("clipsactivity"),
+            activityHints = listOf(
+                "clipsactivity",
+                "clipsvieweractivity",
+                "reelsvieweractivity",
+            ),
         ),
         "chrome" to PlatformRule(enabled = true, urlShapes = DEFAULT_URL_SHAPES),
         "chrome_beta" to PlatformRule(enabled = true, urlShapes = DEFAULT_URL_SHAPES),

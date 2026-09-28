@@ -86,6 +86,25 @@ object EnforcementWall {
     /** True when any wall overlay is currently on screen. */
     fun isShowing(): Boolean = overlay != null
 
+    /** True while the cage lockout is running. */
+    fun isCageActive(): Boolean {
+        val now = SystemClockNow.elapsed
+        if (cageEndElapsed > now) return true
+        val cage = try {
+            (serviceRef?.application as? MldApp)?.stateRepo?.blockingCage()
+        } catch (_: Exception) { null }
+        return cage != null && !cage.isExpired(now)
+    }
+
+    fun getCageEndElapsed(): Long = cageEndElapsed
+
+    /** Reassert the cage overlay if active and currently not on screen. */
+    fun reassertCage(service: AccessibilityService) {
+        if (isCageActive() && overlay == null) {
+            show(service, KIND_CAGE, "", "")
+        }
+    }
+
     /** True while the emergency stand-down window is open. */
     fun inEmergencyWindow(): Boolean =
         SystemClockNow.elapsed < emergencyUntilElapsed
@@ -334,12 +353,18 @@ object EnforcementWall {
                     val now = SystemClockNow.elapsed
                     when (kind) {
                         KIND_CAGE -> {
-                            val cage = app?.stateRepo?.blockingCage()
-                            if (cage == null || cage.isExpired(now)) {
+                            val remaining = if (cageEndElapsed > 0L) {
+                                ((cageEndElapsed - now) / 1000L).coerceAtLeast(0L).toInt()
+                            } else {
+                                val cage = app?.stateRepo?.blockingCage()
+                                if (cage == null || cage.isExpired(now)) 0 else cage.remainingSeconds(now)
+                            }
+                            if (remaining <= 0) {
+                                cageEndElapsed = 0L
                                 hideInternal()
                                 return
                             }
-                            timerView.text = formatSeconds(cage.remainingSeconds(now))
+                            timerView.text = formatSeconds(remaining)
                         }
                         KIND_SHORTS_LOCKOUT -> {
                             timerView.text = formatSeconds(shortsLockoutRemaining(now))

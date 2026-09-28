@@ -150,6 +150,21 @@ class DetoxAccessibilityService : AccessibilityService() {
         val app = application as? MldApp ?: return
 
         // ----------------------------------------------------------------
+        // CAGE LOCKOUT ACTIVE: if cage is running, ONLY dialer is allowed.
+        // If user is not in dialer, reassert the cage screen immediately!
+        // ----------------------------------------------------------------
+        if (EnforcementWall.isCageActive()) {
+            if (EmergencyLockdown.isDialer(this, pkg)) {
+                // Allowed in dialer for emergency
+                return
+            }
+            DiagLog.log("CAGE_ACTIVE", "Non-dialer $pkg blocked while cage active")
+            performGlobalAction(GLOBAL_ACTION_HOME)
+            EnforcementWall.reassertCage(this)
+            return
+        }
+
+        // ----------------------------------------------------------------
         // v2.7 r13 — EMERGENCY LOCKDOWN (user-requested semantics): while
         // the emergency surface is live the phone is a DIALER AND NOTHING
         // ELSE. Every other app is bounced straight back to the dialer;
@@ -198,6 +213,19 @@ class DetoxAccessibilityService : AccessibilityService() {
         if (!app.policyEngine.isEmergency(pkg) &&
             !app.policyEngine.isSystemEssential(pkg) && pkg != packageName) {
             enforceAlwaysOnSurfaces(app, pkg)
+        }
+
+        // ----------------------------------------------------------------
+        // Notification shade / quick settings suppression across ALL modes:
+        // When any mode is active, pulling down shade is immediately dismissed.
+        // ----------------------------------------------------------------
+        if (pkg.contains("systemui", ignoreCase = true) && isAnyModeActive() && !EmergencyLockdown.isActive(this)) {
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
+            }
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            DiagLog.log("SHADE_BLOCKED", "Notification panel dismissed during active mode")
+            return
         }
 
         val decision = app.policyEngine.evaluate(pkg)
@@ -551,36 +579,22 @@ class DetoxAccessibilityService : AccessibilityService() {
 
         manager.onDetection(pkg, strategy) { esc ->
             when (esc.step) {
-                ReelsEscalationManager.Step.TOAST -> {
+                ReelsEscalationManager.Step.TOAST, ReelsEscalationManager.Step.SOFT -> {
                     try {
                         android.widget.Toast.makeText(
-                            this, "Short-form content blocked.",
+                            this, "Short-form content blocked (${esc.count}/5)",
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
                     } catch (_: Exception) {
                     }
                 }
-                ReelsEscalationManager.Step.SOFT -> {
-                    try {
-                        startActivity(ReelsOverlayActivity.intentFor(
-                            this, ReelsOverlayActivity.KIND_SOFT, pkg, esc.count))
-                    } catch (_: Exception) {
-                    }
-                }
                 ReelsEscalationManager.Step.HARD -> {
-                    // v2.5 r9: hard lockout via the a11y overlay wall
-                    // (Social-Sentry parity — overlay covers system bars;
-                    // countdown-gated exit). Activity fallback below.
-                    val shown = if (EnforcementWall.isBound()) {
-                        EnforcementWall.showShortsLockout(this, pkg, esc.count)
-                        EnforcementWall.isShowing()
-                    } else false
-                    if (!shown) {
-                        try {
-                            startActivity(ReelsOverlayActivity.intentFor(
-                                this, ReelsOverlayActivity.KIND_HARD, pkg, esc.count))
-                        } catch (_: Exception) {
-                        }
+                    // 5 consecutive attempts in 1 min -> 1-minute Cage lock
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    if (EnforcementWall.isBound()) {
+                        EnforcementWall.showCage(this, SystemClockNow.elapsed + 60_000L)
+                    } else {
+                        LockController.cage(this)
                     }
                 }
             }
@@ -668,22 +682,35 @@ class DetoxAccessibilityService : AccessibilityService() {
     // the safety overlay only; every other key falls through).
     // -----------------------------------------------------------------
 
+    private fun isAnyModeActive(): Boolean {
+        if (EnforcementWall.isShowing() || EnforcementWall.isCageActive()) return true
+        if (com.maxleveldetox.overlay.SessionKiosk.isWallShowing() ||
+            com.maxleveldetox.overlay.SessionKiosk.isStripShowing()
+        ) return true
+        val app = application as? MldApp
+        val session = try { app?.stateRepo?.blockingSession() } catch (_: Exception) { null }
+        if (session != null && session.status.isEnforcing) return true
+        if (com.maxleveldetox.monk.MonkModeManager.isActive(this)) return true
+        if (com.maxleveldetox.lock.LockMyPhoneService.isAlive) return true
+        return false
+    }
+
     override fun onKeyEvent(event: KeyEvent?): Boolean {
         event ?: return false
-        // v2.5 r9.1: consume BOTH the DOWN and UP halves. Swallowing only
-        // DOWN lets an orphan UP reach the system.
-        // v2.9 r17: the SESSION KIOSK surfaces extend the consumption —
-        // while the kiosk wall OR strips are up (Study/Detox lockdown),
-        // BACK / APP_SWITCH (recents) / HOME hardware keys are dead too
-        // (gesture-home/shade are already consumed by the overlay areas).
-        if (!EnforcementWall.isShowing() &&
-            !com.maxleveldetox.overlay.SessionKiosk.isWallShowing() &&
-            !com.maxleveldetox.overlay.SessionKiosk.isStripShowing()
-        ) return false
+        // Emergency dialer must always stay interactive
+        if (EmergencyLockdown.isActive(this)) return false
+
+        // While ANY mode is active (Study, Detox, Monk, Lock My Phone, Cage, etc.),
+        // Home, Back, Recents hardware and navigation keys are completely blocked
+        // (like the Cage), without changing the original UI of the mode.
+        if (!isAnyModeActive()) return false
+
         return when (event.keyCode) {
             KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_APP_SWITCH,
             KeyEvent.KEYCODE_HOME,
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_ALL_APPS,
             -> true
             else -> false
         }

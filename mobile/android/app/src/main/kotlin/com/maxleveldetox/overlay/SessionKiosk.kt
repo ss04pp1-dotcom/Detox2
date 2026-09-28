@@ -199,9 +199,13 @@ object SessionKiosk {
             return false
         }
 
-        // STUDY allowlist: the app is usable, but shade/gesture areas stay
+        val monkActive = com.maxleveldetox.monk.MonkModeManager.isActive(service)
+        val isAllowedStudy = session != null && pkg in session.allowedPackages
+        val isAllowedMonk = monkActive && pkg in com.maxleveldetox.monk.MonkModeManager.allowedApps(service)
+
+        // STUDY / MONK allowlist: the app is usable, but shade/gesture areas stay
         // covered by the strips.
-        if (pkg in session.allowedPackages) {
+        if (isAllowedStudy || isAllowedMonk) {
             showStripsInternal(service)
             return false
         }
@@ -211,9 +215,12 @@ object SessionKiosk {
         if (isInputMethod(service, pkg)) return false
 
         // Everything else — the LAUNCHER above all — gets the WALL.
-        showWallInternal(service, session, pkg)
-        recordEscapeAttempt(service, session, pkg)
-        return true
+        if (session != null) {
+            showWallInternal(service, session, pkg)
+            recordEscapeAttempt(service, session, pkg)
+            return true
+        }
+        return false
     }
 
     // -----------------------------------------------------------------
@@ -421,12 +428,17 @@ object SessionKiosk {
         val wm = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val density = service.resources.displayMetrics.density
 
-        val statusBar = dimension(service, "status_bar_height", (28 * density).toInt())
-        val navBar = dimension(service, "navigation_bar_height", (48 * density).toInt())
+        val statusBar = maxOf(dimension(service, "status_bar_height", (36 * density).toInt()), (36 * density).toInt())
+        val navBar = maxOf(dimension(service, "navigation_bar_height", (48 * density).toInt()), (54 * density).toInt())
 
         if (topStrip == null) {
             try {
-                val v = View(service).apply { setBackgroundColor(Color.parseColor(STRIP_BG)) }
+                val v = View(service).apply {
+                    setBackgroundColor(Color.parseColor(STRIP_BG))
+                    isClickable = true
+                    isFocusable = false
+                    setOnTouchListener { _, _ -> true }
+                }
                 wm.addView(v, stripParams(statusBar, Gravity.TOP))
                 topStrip = v
             } catch (e: Exception) {
@@ -435,7 +447,12 @@ object SessionKiosk {
         }
         if (bottomStrip == null) {
             try {
-                val v = View(service).apply { setBackgroundColor(Color.parseColor(STRIP_BG)) }
+                val v = View(service).apply {
+                    setBackgroundColor(Color.parseColor(STRIP_BG))
+                    isClickable = true
+                    isFocusable = false
+                    setOnTouchListener { _, _ -> true }
+                }
                 wm.addView(v, stripParams(navBar, Gravity.BOTTOM))
                 bottomStrip = v
             } catch (e: Exception) {

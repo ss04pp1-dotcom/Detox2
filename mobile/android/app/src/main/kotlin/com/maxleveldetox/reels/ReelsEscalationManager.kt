@@ -154,7 +154,6 @@ class ReelsEscalationManager(
                 state = state.copy(hardLockoutCountToday = state.hardLockoutCountToday + 1)
                 Step.HARD
             }
-            next == 2 -> Step.SOFT
             else -> Step.TOAST
         }
 
@@ -377,7 +376,7 @@ class ReelsEscalationManager(
 
     companion object {
         const val RESET_TIMEOUT_MS = 60_000L          // consecutive window
-        const val HARD_THRESHOLD = 3                  // >= 3 -> hard lockout
+        const val HARD_THRESHOLD = 5                  // 5 consecutive attempts -> cage lockout
         const val EMERGENCY_PASSES_PER_DAY = 3
         const val DEFAULT_ALLOWANCE_MINUTES = 30
         const val CHANNEL_REELS = "mld_reels"
