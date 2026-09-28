@@ -53,7 +53,7 @@ class _AccountScreenState extends State<AccountScreen> {
       for (final tx in txs) {
         totalCoins += tx.amount;
       }
-      _streakDays = stats.streakDays > 0 ? stats.streakDays : (progress.data?.streak.streakDays ?? 0);
+      _streakDays = stats.streakDays > 0 ? stats.streakDays : (progress.data?.streak.current ?? 0);
       _coinBalance = totalCoins > 0 ? totalCoins : 0;
       _focusMinutes = (stats.focusSeconds ~/ 60);
     } catch (_) {}
@@ -387,7 +387,7 @@ class _AccountScreenState extends State<AccountScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [
             AppColors.surface,
             AppColors.elevated,
