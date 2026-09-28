@@ -106,6 +106,8 @@ object SessionKiosk {
     private var wallEndElapsed = 0L
     private var wallMode = SessionMode.DETOX
     private var wallSubject = ""
+    private var wallTotalSeconds = 0
+    private var nativeKioskView: NativeLockKioskView? = null
     private var lastViolationAt = mutableMapOf<String, Long>()
 
     // -----------------------------------------------------------------
@@ -247,11 +249,10 @@ object SessionKiosk {
         handler.post {
             if (serviceRef == null || isWallShowing()) return@post
             when {
-                top == null -> showStripsInternal(context)
-                top == context.packageName || top in session.allowedPackages ->
+                top != null && top in session.allowedPackages ->
                     showStripsInternal(context)
                 isInputMethod(context, top) -> showStripsInternal(context)
-                else -> showWallInternal(context, session, top)
+                else -> showWallInternal(context, session, top ?: "")
             }
         }
     }
@@ -265,8 +266,9 @@ object SessionKiosk {
     // -----------------------------------------------------------------
 
     fun onOwnAppResumed(context: Context) {
-        if (armedSession(context) != null) {
-            handler.post { if (serviceRef != null) showStripsInternal(context) }
+        val s = armedSession(context)
+        if (s != null) {
+            handler.post { if (serviceRef != null) showWallInternal(context, s, context.packageName) }
         }
     }
 
@@ -303,90 +305,35 @@ object SessionKiosk {
         wallEndElapsed = session.endElapsed
         wallMode = session.mode
         wallSubject = session.subjectName
+        wallTotalSeconds = session.totalSeconds()
 
-        val isStudy = session.mode == SessionMode.STUDY
-
-        val timerView = TextView(service).apply {
-            textSize = 56f
-            setTextColor(Color.WHITE)
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            letterSpacing = 0.08f
-        }
-
-        val root = LinearLayout(service).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor(WALL_BG))
-            setPadding(pad, pad * 2, pad, pad * 2)
-        }
-
-        fun title(text: String): TextView = TextView(service).apply {
-            this.text = text
-            textSize = 30f
-            setTextColor(Color.parseColor(ACCENT))
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            gravity = Gravity.CENTER
-            letterSpacing = 0.08f
-        }
-
-        fun body(text: String): TextView = TextView(service).apply {
-            this.text = text
-            textSize = 15f
-            setTextColor(Color.parseColor("#94A3B8"))
-            gravity = Gravity.CENTER
-            setPadding(0, pad / 2, 0, 0)
-        }
-
-        root.addView(title(if (isStudy) "STUDY LOCK" else "DETOX LOCK"))
-        root.addView(timerView)
-        if (isStudy && wallSubject.isNotBlank()) {
-            root.addView(body("Subject: $wallSubject"))
-        }
-        root.addView(body(
-            "This session is enforcing total lockout.\n" +
-                "Nothing else on the phone works until it ends."
-        ))
-
-        if (isStudy) {
-            val shortcuts = shortcutsFor(service, session)
-            if (shortcuts.isNotEmpty()) {
-                root.addView(body("Allowed study apps:"))
-                root.addView(ScrollView(service).apply {
-                    isVerticalScrollBarEnabled = false
-                    addView(LinearLayout(service).apply {
-                        orientation = LinearLayout.VERTICAL
-                        for ((pkg, label) in shortcuts) {
-                            addView(solidButton(service, label, Color.parseColor(ACCENT)) {
-                                launchAllowed(service, pkg)
-                            })
+        val kiosk = NativeLockKioskView(
+            service = service,
+            mode = session.mode,
+            subjectName = session.subjectName,
+            totalDurationSeconds = session.totalSeconds(),
+            endElapsed = session.endElapsed,
+            allowedPackages = session.allowedPackages,
+            onOpenApp = { openOwnApp(service) },
+            onLaunchAllowed = { pkg -> launchAllowed(service, pkg) },
+            onWatchAd = {
+                try {
+                    val app = service.applicationContext as? MldApp ?: MldApp.instance
+                    val txId = "ad_lock_" + System.currentTimeMillis()
+                    scope.launch {
+                        app.coinLedger.awardAd(txId)
+                        handler.post {
+                            nativeKioskView?.updateTick(
+                                ((wallEndElapsed - SystemClockNow.elapsed) / 1000L).coerceAtLeast(0L).toInt(),
+                                wallTotalSeconds
+                            )
                         }
-                    })
-                }.also {
-                    it.layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-                    )
-                })
+                    }
+                } catch (_: Exception) {}
             }
-        }
-
-        root.addView(solidButton(service, "OPEN SESSION", Color.parseColor(ACCENT)) {
-            openOwnApp(service)
-        })
-
-        // Emergency is ALWAYS reachable (PRD §27).
-        root.addView(Button(service).apply {
-            text = "Emergency"
-            setTextColor(Color.parseColor(DANGER))
-            textSize = 13f
-            setBackgroundColor(Color.TRANSPARENT)
-            isAllCaps = true
-            setOnClickListener {
-                com.maxleveldetox.safety.EmergencyLockdown.start(service)
-                com.maxleveldetox.safety.EmergencyLockdown.openDialer(service)
-            }
-        })
-
+        )
+        nativeKioskView = kiosk
+        val root = kiosk
         @Suppress("DEPRECATION")
         root.systemUiVisibility =
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
@@ -510,14 +457,17 @@ object SessionKiosk {
                 tick++
 
                 // Countdown paint (wall only).
-                if (wall != null && timerView != null) {
+                if (wall != null) {
                     val remain = ((wallEndElapsed - SystemClockNow.elapsed) / 1000L)
                         .coerceAtLeast(0L).toInt()
-                    val h = remain / 3600
-                    val m = (remain % 3600) / 60
-                    val s = remain % 60
-                    timerView.text = if (h > 0)
-                        "%02d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+                    nativeKioskView?.updateTick(remain, wallTotalSeconds)
+                    if (timerView != null) {
+                        val h = remain / 3600
+                        val m = (remain % 3600) / 60
+                        val s = remain % 60
+                        timerView.text = if (h > 0)
+                            "%02d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+                    }
                 }
 
                 // Disarm self-healing: re-read the armed state every
@@ -540,6 +490,7 @@ object SessionKiosk {
     private fun removeAllInternal() {
         ticker?.let { handler.removeCallbacks(it) }
         ticker = null
+        nativeKioskView = null
         val svc = serviceRef
         val views = listOfNotNull(wall, topStrip, bottomStrip)
         wall = null
@@ -688,6 +639,7 @@ object SessionKiosk {
         session: SessionSnapshot,
         pkg: String,
     ) {
+        nativeKioskView?.recordViolation()
         val now = SystemClockNow.elapsed
         synchronized(lastViolationAt) {
             val last = lastViolationAt[pkg] ?: 0L

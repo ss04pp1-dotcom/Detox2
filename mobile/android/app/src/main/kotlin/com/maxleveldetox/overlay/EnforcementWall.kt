@@ -69,6 +69,7 @@ object EnforcementWall {
     private var ticker: Runnable? = null
     private var emergencyUntilElapsed = 0L
     private var cageEndElapsed = 0L
+    private var nativeCageView: NativeLockKioskView? = null
 
     /** Bound while the accessibility service is connected (engine 1). */
     fun bind(service: AccessibilityService) {
@@ -180,11 +181,24 @@ object EnforcementWall {
 
         val pad = (service.resources.displayMetrics.density * 24).toInt()
 
-        val root = LinearLayout(service).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#0A0E1A"))
-            setPadding(pad, pad * 2, pad, pad * 2)
+        val root = if (kind == KIND_CAGE) {
+            val cageKiosk = NativeLockKioskView(
+                service = service,
+                mode = com.maxleveldetox.enforcement.SessionMode.DETOX,
+                subjectName = "",
+                totalDurationSeconds = 60,
+                endElapsed = cageEndElapsed,
+                isCage = true,
+            )
+            nativeCageView = cageKiosk
+            cageKiosk
+        } else {
+            LinearLayout(service).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setBackgroundColor(Color.parseColor("#0A0E1A"))
+                setPadding(pad, pad * 2, pad, pad * 2)
+            }
         }
 
         fun title(text: String): TextView = TextView(service).apply {
@@ -212,10 +226,7 @@ object EnforcementWall {
 
         when (kind) {
             KIND_CAGE -> {
-                root.addView(title("CAGE"))
-                root.addView(timerView)
-                root.addView(body("Repeated violations detected.\nThe restriction is temporarily intensified."))
-                root.addView(body("The cage opens automatically at zero."))
+                // Handled natively by NativeLockKioskView
             }
             KIND_HARD -> {
                 root.addView(title("ACCESS BLOCKED"))
@@ -351,6 +362,7 @@ object EnforcementWall {
                                 hideInternal()
                                 return
                             }
+                            nativeCageView?.updateTick(remaining, 60)
                             timerView.text = formatSeconds(remaining)
                         }
                         else -> {
@@ -405,6 +417,7 @@ object EnforcementWall {
     private fun hideInternal() {
         ticker?.let { handler.removeCallbacks(it) }
         ticker = null
+        nativeCageView = null
         // v2.5.5 audit fix m-5: clear the state fields BEFORE the serviceRef
         // bail-out — after unbind() (service death) the old code returned
         // early with overlay != null, so isShowing() lied until the next
