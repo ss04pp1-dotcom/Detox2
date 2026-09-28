@@ -46,10 +46,15 @@ class _AccountScreenState extends State<AccountScreen> {
 
     // Fetch user local stats
     try {
-      final state = await NativeBridge.instance.getState();
       final stats = await NativeBridge.instance.getWeeklyStats();
-      _streakDays = state.streakDays;
-      _coinBalance = state.coinBalance;
+      final progress = await NativeBridge.instance.getProgress();
+      final txs = await NativeBridge.instance.getCoinTransactions(limit: 100);
+      int totalCoins = 0;
+      for (final tx in txs) {
+        totalCoins += tx.amount;
+      }
+      _streakDays = stats.streakDays > 0 ? stats.streakDays : (progress.data?.streak.streakDays ?? 0);
+      _coinBalance = totalCoins > 0 ? totalCoins : 0;
       _focusMinutes = (stats.focusSeconds ~/ 60);
     } catch (_) {}
 
