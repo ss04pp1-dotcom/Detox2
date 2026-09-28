@@ -243,7 +243,7 @@ class MldApp : Application() {
     }
 
     companion object {
-        private lateinit var instance: MldApp
+        lateinit var instance: MldApp
 
         /** v2.5.5 audit fix m-19: never leak
          * UninitializedPropertyAccessException when called before

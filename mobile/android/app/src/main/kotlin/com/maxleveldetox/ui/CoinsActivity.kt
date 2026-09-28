@@ -172,7 +172,7 @@ class CoinsActivity : AppCompatActivity() {
                             val col = LinearLayout(this@CoinsActivity).apply {
                                 orientation = LinearLayout.VERTICAL
                                 val title = TextView(this@CoinsActivity).apply {
-                                    text = tx.type.name
+                                    text = tx.type
                                     textSize = 13f
                                     setTextColor(Color.parseColor(MldDesign.COLOR_TEXT_PRIMARY))
                                     typeface = Typeface.DEFAULT_BOLD
@@ -186,8 +186,8 @@ class CoinsActivity : AppCompatActivity() {
                                 addView(date)
                             }
                             val deltaTv = TextView(this@CoinsActivity).apply {
-                                val isPos = tx.delta >= 0
-                                text = if (isPos) "+${tx.delta}" else "${tx.delta}"
+                                val isPos = tx.amount >= 0
+                                text = if (isPos) "+${tx.amount}" else "${tx.amount}"
                                 textSize = 15f
                                 setTextColor(if (isPos) Color.parseColor(MldDesign.ACCENT_SUCCESS) else Color.parseColor(MldDesign.ACCENT_DANGER))
                                 typeface = Typeface.DEFAULT_BOLD

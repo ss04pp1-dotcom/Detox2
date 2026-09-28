@@ -64,12 +64,12 @@ jobs:
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ] && [ -n "${{ secrets.KEYSTORE_PASSWORD }}" ]; then
             echo "Configuring Release Keystore from secrets..."
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/mld-release.keystore
-            cat <<EOF > android/key.properties
-          storeFile=mld-release.keystore
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS || 'mldrelease' }}
-          keyPassword=${{ secrets.KEY_PASSWORD || secrets.KEYSTORE_PASSWORD }}
-          EOF
+            {
+              echo "storeFile=mld-release.keystore"
+              echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
+              echo "keyAlias=${{ secrets.KEY_ALIAS || 'mldrelease' }}"
+              echo "keyPassword=${{ secrets.KEY_PASSWORD || secrets.KEYSTORE_PASSWORD }}"
+            } > android/key.properties
             echo "signed=true" >> $GITHUB_OUTPUT
           elif [ -f android/key.properties ] && [ -f android/keystore/release.jks ]; then
             echo "Using committed release keystore (SHA-1: C0:3A:B9:67:C4:B5:08:AB:5E:8D:D6:F7:09:F9:20:36:92:46:85:7B)"

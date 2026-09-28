@@ -251,7 +251,7 @@ object SessionKiosk {
             when {
                 top != null && top in session.allowedPackages ->
                     showStripsInternal(context)
-                isInputMethod(context, top) -> showStripsInternal(context)
+                top != null && isInputMethod(context, top) -> showStripsInternal(context)
                 else -> showWallInternal(context, session, top ?: "")
             }
         }
@@ -364,7 +364,7 @@ object SessionKiosk {
             wm.addView(root, params)
             wall = root
             DiagLog.log("KIOSK_WALL", "mode=${session.mode} fg=$foregroundPkg")
-            startTicker(service, timerView)
+            startTicker(service, null)
         } catch (e: Exception) {
             DiagLog.logError("SessionKiosk.showWall", e)
         }

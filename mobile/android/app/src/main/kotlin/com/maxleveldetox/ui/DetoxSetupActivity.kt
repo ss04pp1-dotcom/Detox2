@@ -152,15 +152,20 @@ class DetoxSetupActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val app = applicationContext as MldApp
-                SessionEngine.start(
-                    app = app,
+                val result = app.sessionEngine.startSession(
                     mode = SessionMode.DETOX,
-                    durationSeconds = selectedMinutes * 60,
-                    strictness = Strictness.HARD,
-                    allowedPackages = emptySet(),
-                    blockedCategories = emptySet(),
-                    subjectName = ""
+                    durationMinutes = selectedMinutes,
+                    strictness = Strictness.MAXLEVEL,
+                    allowedPackages = emptyList(),
+                    blockedCategories = emptyList(),
+                    subject = ""
                 )
+                if (!result.ok) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@DetoxSetupActivity, result.message ?: "Failed to start detox", Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
                 withContext(Dispatchers.Main) {
                     SessionKiosk.sync(this@DetoxSetupActivity)
                     Toast.makeText(this@DetoxSetupActivity, "Detox engaged for $selectedMinutes min", Toast.LENGTH_SHORT).show()

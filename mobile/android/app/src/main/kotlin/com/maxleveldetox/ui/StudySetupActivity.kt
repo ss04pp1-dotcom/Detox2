@@ -269,15 +269,20 @@ class StudySetupActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val app = applicationContext as MldApp
-                SessionEngine.start(
-                    app = app,
+                val result = app.sessionEngine.startSession(
                     mode = SessionMode.STUDY,
-                    durationSeconds = selectedMinutes * 60,
-                    strictness = Strictness.HARD,
-                    allowedPackages = allowedPackages,
-                    blockedCategories = emptySet(),
-                    subjectName = selectedSubject
+                    durationMinutes = selectedMinutes,
+                    strictness = Strictness.MAXLEVEL,
+                    allowedPackages = allowedPackages.toList(),
+                    blockedCategories = emptyList(),
+                    subject = selectedSubject
                 )
+                if (!result.ok) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@StudySetupActivity, result.message ?: "Failed to start study session", Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
                 withContext(Dispatchers.Main) {
                     SessionKiosk.sync(this@StudySetupActivity)
                     Toast.makeText(this@StudySetupActivity, "Study session started: $selectedMinutes min", Toast.LENGTH_SHORT).show()
