@@ -26,16 +26,19 @@ import com.maxleveldetox.accessibility.DiagLog
  *   2. RUNG 3 — ROOT REVISIT — launch the app's own launcher intent with
  *      CLEAR_TOP|SINGLE_TOP. The app's root activity comes forward and
  *      everything stacked above it is finished. Same app, same task.
- *   3. RUNG 4 — HOME — the old kick-out. Only when everything above
- *      failed, or for platforms with NO safe in-app surface (TikTok: the
- *      whole app IS the feed; Chrome: a shorts URL is just a tab).
  *
- * CLOSED LOOP: each detection advances the per-package rung counter; the
- * a11y service's scheduled re-scans (+500/+1500/+3000 ms) re-run detection
- * after every redirect, so a redirect that DIDN'T stick (the old Facebook
- * bug: root-revisit reported success but the reels screen survived)
- * automatically advances to the next rung instead of silently winning.
- * The counter self-resets after RUNG_RESET_MS without a detection.
+ * v2.9.2 r18 (user-requested): the caller NEVER kicks the user out of a
+ * feed platform — when every rung fails it re-arms the closed loop
+ * (scheduled re-scans + episode verification keep fighting INSIDE the
+ * app). HOME remains correct ONLY for platforms with no safe in-app
+ * surface at all (TikTok: the whole app IS the feed; Chrome: a shorts
+ * URL is just a tab) — see NO_SAFE_SURFACE.
+ *
+ * CLOSED LOOP: the a11y service's scheduled re-scans (+500/+1500/
+ * +3000/+5000/+8000 ms) and the episode verification loop re-run
+ * detection after every redirect, so a redirect that DIDN'T stick (the
+ * old Facebook bug: root-revisit reported success but the reels screen
+ * survived) automatically retries instead of silently winning.
  *
  * SECURITY: this navigates the TARGET app only. It never weakens the
  * escalation ladder, quotas, debounces or violation recording — those are

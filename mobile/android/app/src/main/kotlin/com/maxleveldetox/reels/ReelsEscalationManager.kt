@@ -375,8 +375,13 @@ class ReelsEscalationManager(
     }
 
     companion object {
-        const val RESET_TIMEOUT_MS = 60_000L          // consecutive window
-        const val HARD_THRESHOLD = 5                  // 5 consecutive attempts -> cage lockout
+        // v2.9.2 r18 (user-requested burst semantics): attempts spaced
+        // ~1 minute apart must NEVER accumulate to the cage — only a rapid
+        // burst ("ak tana" — 5 entries in one continuous stretch, each
+        // less than ~50 s after the previous) escalates. A quiet gap
+        // longer than the window resets the counter completely.
+        const val RESET_TIMEOUT_MS = 50_000L          // consecutive window
+        const val HARD_THRESHOLD = 5                  // 5 rapid attempts -> 1-minute cage lockout
         const val EMERGENCY_PASSES_PER_DAY = 3
         const val DEFAULT_ALLOWANCE_MINUTES = 30
         const val CHANNEL_REELS = "mld_reels"

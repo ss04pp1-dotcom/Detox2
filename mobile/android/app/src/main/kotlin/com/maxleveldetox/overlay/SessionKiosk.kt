@@ -125,6 +125,14 @@ object SessionKiosk {
     fun isWallShowing(): Boolean = wall != null
     fun isStripShowing(): Boolean = topStrip != null || bottomStrip != null
 
+    /**
+     * v2.9.2 r18 — public armed check (MainActivity consumes the BACK
+     * gesture/key while armed, so the session screen itself holds the
+     * user like the cage). True while a session is actively enforcing
+     * with no stand-down window open.
+     */
+    fun isArmed(context: Context): Boolean = armedSession(context) != null
+
     // -----------------------------------------------------------------
     // Armed-state computation
     // -----------------------------------------------------------------

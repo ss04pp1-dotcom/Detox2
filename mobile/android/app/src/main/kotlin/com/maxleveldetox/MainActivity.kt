@@ -25,6 +25,26 @@ class MainActivity : FlutterActivity() {
     // created per configureFlutterEngine call.
     private var bridge: NativeBridge? = null
 
+    // ------------------------------------------------------------------
+    // v2.9.2 r18 (user-requested): while the SESSION KIOSK is armed the
+    // session screen itself holds the user like the cage — the BACK key
+    // AND the gesture-back are consumed right here (the manifest pins
+    // enableOnBackInvokedCallback=false, so the classic path is the one
+    // the OS uses on every API level). Evaluated at press time — always
+    // fresh, no polling, no I/O.
+    // ------------------------------------------------------------------
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        val locked = try {
+            com.maxleveldetox.overlay.SessionKiosk.isWallShowing() ||
+                com.maxleveldetox.overlay.SessionKiosk.isStripShowing()
+        } catch (_: Exception) {
+            false
+        }
+        if (locked) return // consumed — kiosk armed: NOTHING happens
+        super.onBackPressed()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
