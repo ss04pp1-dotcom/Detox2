@@ -52,7 +52,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.9'
           channel: 'stable'
           cache: true
 
@@ -104,29 +103,25 @@ jobs:
             FLAGS="$FLAGS --dart-define=MLD_REWARDED_UNIT=$REWARD_UNIT"
           fi
           
-          # Gradle AdMob App ID
+          # Gradle AdMob App ID (written directly to gradle.properties)
           ADMOB_APP="${{ github.event.inputs.admob_app_id || secrets.MLD_ADMOB_APP_ID }}"
-          GRADLE_FLAGS=""
           if [ -n "$ADMOB_APP" ]; then
-            GRADLE_FLAGS="-PMLD_ADMOB_APP_ID=$ADMOB_APP"
+            echo "MLD_ADMOB_APP_ID=$ADMOB_APP" >> android/gradle.properties
           fi
           
           echo "build_flags=$FLAGS" >> $GITHUB_OUTPUT
-          echo "gradle_flags=$GRADLE_FLAGS" >> $GITHUB_OUTPUT
 
       - name: Build Release APK (arm64)
         run: |
           flutter build apk --release \
             --target-platform android-arm64 \
             --no-tree-shake-icons \
-            ${{ steps.flags.outputs.gradle_flags }} \
             ${{ steps.flags.outputs.build_flags }}
 
       - name: Build Release App Bundle (AAB for Play Store)
         run: |
           flutter build appbundle --release \
             --no-tree-shake-icons \
-            ${{ steps.flags.outputs.gradle_flags }} \
             ${{ steps.flags.outputs.build_flags }}
 
       - name: Upload Release APK Artifact
