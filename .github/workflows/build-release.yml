@@ -57,7 +57,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Configure Keystore (from Secrets or Debug fallback)
+      - name: Configure Keystore (from Secrets or Committed Keystore or Debug fallback)
         id: keystore
         run: |
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ] && [ -n "${{ secrets.KEYSTORE_PASSWORD }}" ]; then
@@ -69,6 +69,9 @@ jobs:
           keyAlias=${{ secrets.KEY_ALIAS || 'mldrelease' }}
           keyPassword=${{ secrets.KEY_PASSWORD || secrets.KEYSTORE_PASSWORD }}
           EOF
+            echo "signed=true" >> $GITHUB_OUTPUT
+          elif [ -f android/key.properties ] && [ -f android/keystore/release.jks ]; then
+            echo "Using committed release keystore (SHA-1: C0:3A:B9:67:C4:B5:08:AB:5E:8D:D6:F7:09:F9:20:36:92:46:85:7B)"
             echo "signed=true" >> $GITHUB_OUTPUT
           else
             echo "No keystore secrets detected; building with fallback debug signing."
@@ -88,7 +91,7 @@ jobs:
           FLAGS="$FLAGS --dart-define=MLD_API_BASE=$API_URL"
           
           # Google Client ID
-          CLIENT_ID="${{ github.event.inputs.google_client_id || secrets.MLD_GOOGLE_SERVER_CLIENT_ID }}"
+          CLIENT_ID="${{ github.event.inputs.google_client_id || secrets.MLD_GOOGLE_SERVER_CLIENT_ID || '759076444069-u6560l4efdlbpohtfchc37jgq5s687u3.apps.googleusercontent.com' }}"
           if [ -n "$CLIENT_ID" ]; then
             FLAGS="$FLAGS --dart-define=MLD_GOOGLE_SERVER_CLIENT_ID=$CLIENT_ID"
           fi

@@ -3,6 +3,7 @@ plugins {
     id "kotlin-android"
     id "kotlin-kapt"
     id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
 }
 
 // Release signing — loads credentials from android/key.properties and the
@@ -49,7 +50,7 @@ android {
         // over r3 — no uninstall, data preserved. Kotlin classes and R stay
         // under the com.maxleveldetox namespace (component names in the
         // compiled manifest are already fully-qualified against it).
-        applicationId = "com.maxleveldet0x"
+        applicationId = "com.sonexdev.detox"
         minSdk = 26          // Android 8.0 — covers ~98% of active devices
         targetSdk = 35
         versionCode = 30

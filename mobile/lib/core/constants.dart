@@ -101,5 +101,6 @@ abstract final class AppConstants {
   //   flutter build apk --dart-define=MLD_GOOGLE_SERVER_CLIENT_ID=1234-abc.apps.googleusercontent.com
   static const String googleServerClientId = String.fromEnvironment(
     'MLD_GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '759076444069-u6560l4efdlbpohtfchc37jgq5s687u3.apps.googleusercontent.com',
   );
 }

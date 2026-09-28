@@ -51,7 +51,7 @@ const MAX_EVENT_PAYLOAD_JSON = 10_000;
 /** Play Store package name — must match the shipped Android applicationId
  * (mobile/android/app/build.gradle: `com.maxleveldet0x`, deliberately
  * obfuscated). A mismatch makes Play answer 404 for every purchase lookup. */
-const PACKAGE_NAME = 'com.maxleveldet0x';
+const PACKAGE_NAME = 'com.sonexdev.detox';
 
 const TOKEN_RE = /^[0-9a-f]{64}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
