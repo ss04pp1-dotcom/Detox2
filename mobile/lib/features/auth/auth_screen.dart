@@ -7,6 +7,7 @@ import '../../core/constants.dart';
 import '../../core/theme/tokens.dart';
 import '../../data/api_client.dart';
 import '../../data/app_state.dart';
+import '../../main.dart';
 import '../../shared/mld_widgets.dart';
 
 class AuthScreen extends StatefulWidget {

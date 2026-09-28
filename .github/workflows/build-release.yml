@@ -54,8 +54,8 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android Licenses
+        run: yes | flutter doctor --android-licenses || true
 
       - name: Configure Keystore (from Secrets or Committed Keystore or Debug fallback)
         id: keystore
