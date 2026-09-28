@@ -34,6 +34,10 @@
     <string name="device_admin_explanation">MAXLEVEL DETOX uses device admin only to lock the screen for the scheduled lock-my-phone mode you set up. It cannot wipe or reset anything, and you can remove it any time outside a session.</string>
 
     <!-- v2.0 Phase B: reels ladder / monk / safety pause / prime commit -->
+    <string name="channel_reels">Reels protection</string>
+    <string name="channel_reels_desc">Short-form content escalation status</string>
+    <string name="notif_reels_lockout_done_title">Lockout finished</string>
+    <string name="notif_reels_lockout_done_body">Your 10-second cooldown is over and the app was closed. Your focus is being restored.</string>
     <string name="channel_monk">Monk mode</string>
     <string name="channel_monk_desc">Device lockdown status</string>
     <string name="notif_monk_active">Monk mode active · device locked to your allowlist</string>

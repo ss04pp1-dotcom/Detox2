@@ -35,11 +35,10 @@ import java.util.Locale
  *     advice — the copy always says "hoto" (would have been), never promises)
  *
  * SURFACES:
- *   1. InsightNotifier daily summary — appended when today ≥ 30 minutes.
- *   2. Flutter Insights screen via NativeBridge.getOpportunityCost (plus
+ *   1. ReelsOverlayActivity soft/hard card — one rotating Banglish line.
+ *   2. InsightNotifier daily summary — appended when today ≥ 30 minutes.
+ *   3. Flutter Insights screen via NativeBridge.getOpportunityCost (plus
  *      getDistractionTrend for the 7-day chart card).
- *   (v2.9.4 r20: surface #3 in v2.5.9 was the ReelsOverlayActivity card —
- *   that activity was unreachable dead code and was removed.)
  */
 object OpportunityCostEngine {
 

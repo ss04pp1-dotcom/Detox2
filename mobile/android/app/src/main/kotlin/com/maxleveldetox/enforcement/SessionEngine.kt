@@ -417,19 +417,13 @@ class SessionEngine(
             }
         }
 
-        // -----------------------------------------------------------------
-        // v2.9.4 r20 — LEGACY PERSISTED-CAGE CLEANUP. The only production
-        // cage is the 60 s IN-MEMORY burst cage (EnforcementWall). Nothing
-        // persists a cage any more, but DataStore survives app updates and
-        // elapsedRealtime resets on reboot — a leftover 30-minute cage
-        // (written by pre-r18 in-session shorts attempts) or one warped by
-        // a reboot could "reassert the cage" over every app switch for
-        // hours or days after the user had long left shorts. Clear it.
-        // -----------------------------------------------------------------
         val cage = stateRepo.blockingCage()
         if (cage.active) {
-            stateRepo.saveCage(CageSnapshot.INACTIVE)
-            cancelAlarm(EnforcementReceiver.ACTION_CAGE_END)
+            if (cage.isExpired(SystemClockNow.elapsed)) {
+                releaseCageIfExpired()
+            } else {
+                scheduleAlarm(EnforcementReceiver.ACTION_CAGE_END, cage.endElapsed)
+            }
         }
 
         Broadcaster.emit()

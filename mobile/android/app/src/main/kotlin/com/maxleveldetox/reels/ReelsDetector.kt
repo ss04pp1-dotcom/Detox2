@@ -34,6 +34,8 @@ class ReelsDetector {
         /** Reels-adjacent navigation surface (tab, profile link) — counts,
          *  but the caller may treat it as a softer signal. */
         NAV,
+        /** Browser URL pointing at a shorts feed. */
+        URL,
     }
 
     data class Detection(val surface: Surface, val strategy: String)
@@ -52,6 +54,7 @@ class ReelsDetector {
             Shape.VIEW_ID -> detectByViewIds(pkg, rootNode, resolved)
             Shape.PACKAGE_GATE -> Detection(Surface.FEED, "tiktok_instant_home")
             Shape.TEXT_BFS -> detectByTextBfs(event, rootNode, resolved)
+            Shape.URL -> detectByUrl(pkg, rootNode, resolved)
         }
     }
 
@@ -163,6 +166,22 @@ class ReelsDetector {
                 Detection(Surface.NAV, "fb_reel_details_partial")
             else -> null
         }
+    }
+
+    // -----------------------------------------------------------------
+    // URL strategy — Chrome (stable + beta): url_bar text matched against
+    // the configured URL shapes (the URL itself is read in memory only).
+    // -----------------------------------------------------------------
+
+    private fun detectByUrl(
+        pkg: String,
+        root: AccessibilityNodeInfo?,
+        resolved: DetectionRules.Resolved,
+    ): Detection? {
+        val urlNode = findByViewId(root, "$pkg:id/url_bar") ?: return null
+        val url = urlNode.text?.toString()?.lowercase() ?: return null
+        val isShortsUrl = resolved.rule.urlShapes.any { shape -> url.contains(shape) }
+        return if (isShortsUrl) Detection(Surface.URL, "chrome_url") else null
     }
 
     // -----------------------------------------------------------------

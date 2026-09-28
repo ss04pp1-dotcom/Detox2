@@ -20,6 +20,7 @@ import android.view.KeyEvent
 import com.maxleveldetox.overlay.EnforcementWall
 import com.maxleveldetox.reels.ReelsDetector
 import com.maxleveldetox.reels.ReelsEscalationManager
+import com.maxleveldetox.reels.ReelsOverlayActivity
 import com.maxleveldetox.reels.ReelsRedirect
 import com.maxleveldetox.safety.EmergencyLockdown
 import com.maxleveldetox.safety.SafetyPauseActivity
@@ -146,7 +147,7 @@ class DetoxAccessibilityService : AccessibilityService() {
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                handleForeground(pkg, event)
+                handleForeground(pkg)
                 // v2.9 r16: window-state carries the ACTIVITY class name —
                 // the cheapest, most drift-resistant reels signal (YouTube
                 // Shorts / FB Reels players are dedicated activities). Also
@@ -162,7 +163,7 @@ class DetoxAccessibilityService : AccessibilityService() {
     // Foreground package enforcement
     // -----------------------------------------------------------------
 
-    private fun handleForeground(pkg: String, event: AccessibilityEvent) {
+    private fun handleForeground(pkg: String) {
         val now = android.os.SystemClock.elapsedRealtime()
         synchronized(lastHandled) {
             val last = lastHandled["fg:$pkg"] ?: 0L
@@ -239,32 +240,16 @@ class DetoxAccessibilityService : AccessibilityService() {
         }
 
         // ----------------------------------------------------------------
-        // Notification shade suppression across ALL modes (v2.9.4 r20 fix):
-        // a SystemUI window that is NOT explicitly denylisted is treated as
-        // the shade and collapsed. r19 and earlier fired on EVERY systemui
-        // window-state change — including the VOLUME dialog, recents, the
-        // power menu and heads-ups — which injected stray BACK/DISMISS
-        // actions on every volume press ("ekbar chap dile koyekta chap
-        // niyeche"). The denylist mirrors ShadeGuard's NOT_SHADE_HINTS.
-        // On API 31+ the DISMISS action alone is used; the extra BACK was
-        // pressed into whatever app was behind and stole real back presses.
+        // Notification shade / quick settings suppression across ALL modes:
+        // When any mode is active, pulling down shade is immediately dismissed.
         // ----------------------------------------------------------------
         if (pkg.contains("systemui", ignoreCase = true) && isAnyModeActive() && !EmergencyLockdown.isActive(this)) {
-            val sysCls = (event.className?.toString() ?: "").lowercase()
-            val notShade = listOf(
-                "recents", "globalactions", "clipboard", "ime", "inputmethod",
-                "volume", "screenshot", "imagewire", "bubbles", "wallet",
-                "mediacontrol", "workspaces", "keyguard",
-            ).any { sysCls.contains(it) }
-            if (!notShade) {
-                if (android.os.Build.VERSION.SDK_INT >= 31) {
-                    performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
-                } else {
-                    performGlobalAction(GLOBAL_ACTION_BACK)
-                }
-                DiagLog.log("SHADE_BLOCKED", "shade collapsed (cls=$sysCls)")
-                return
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
             }
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            DiagLog.log("SHADE_BLOCKED", "Notification panel dismissed during active mode")
+            return
         }
 
         val decision = app.policyEngine.evaluate(pkg)
@@ -607,13 +592,7 @@ class DetoxAccessibilityService : AccessibilityService() {
      *     feed/home. The user is NEVER kicked out of a feed platform —
      *     when the ladder fails, the closed-loop re-scans keep fighting
      *     INSIDE the app. HOME remains only for platforms with no safe
-     *     surface at all (TikTok — the whole app IS the feed; browser
-     *     shorts tabs were removed with the URL strategy, r20).
-     *
-     *   - v2.9.4 r20: the redirect ladder is PER PLATFORM (YouTube /
-     *     Instagram: bottom-nav Home tab FIRST, BACK only as the last
-     *     rung) and rate-limited (min 2 s between attempts) — the old
-     *     BACK-first machine-gun is what exited apps.
+     *     surface at all (TikTok, browser shorts tabs).
      *
      *   - An "attempt" = a fresh reels ENTRY (episode tracking above).
      *     Detections while the same reels surface is still on screen
@@ -664,25 +643,26 @@ class DetoxAccessibilityService : AccessibilityService() {
             }
 
             manager.onDetection(pkg, strategy) { esc ->
-                if (esc.step == ReelsEscalationManager.Step.HARD) {
-                    // 5 rapid attempts in one stretch -> 1-minute cage.
-                    // v2.9.4 r20: the cage end is ALWAYS the 60 s burst cage
-                    // (the old 30-minute default in LockController.cage was
-                    // a zombie-cage source — see SessionEngine.recoverIfNeeded).
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                    val cageEnd = SystemClockNow.elapsed + REELS_CAGE_MS
-                    if (EnforcementWall.isBound()) {
-                        EnforcementWall.showCage(this, cageEnd)
-                    } else {
-                        LockController.cage(this, cageEnd)
+                when (esc.step) {
+                    ReelsEscalationManager.Step.TOAST,
+                    ReelsEscalationManager.Step.SOFT -> {
+                        try {
+                            android.widget.Toast.makeText(
+                                this, "Short-form content blocked (${esc.count}/5)",
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        } catch (_: Exception) {
+                        }
                     }
-                } else {
-                    try {
-                        android.widget.Toast.makeText(
-                            this, "Short-form content blocked (${esc.count}/5)",
-                            android.widget.Toast.LENGTH_SHORT,
-                        ).show()
-                    } catch (_: Exception) {
+                    ReelsEscalationManager.Step.HARD -> {
+                        // 5 rapid attempts in one stretch -> 1-minute cage.
+                        performGlobalAction(GLOBAL_ACTION_HOME)
+                        if (EnforcementWall.isBound()) {
+                            EnforcementWall.showCage(
+                                this, SystemClockNow.elapsed + REELS_CAGE_MS)
+                        } else {
+                            LockController.cage(this)
+                        }
                     }
                 }
             }
@@ -698,15 +678,6 @@ class DetoxAccessibilityService : AccessibilityService() {
      * reels surface is gone the episode CLOSES (the next detection is a
      * fresh attempt); if it survived the redirect, fight again — bounded
      * to ~12 s past the last detection. Single-flight per package.
-     *
-     * v2.9.4 r20 (user-reported kick-out fix): NEVER navigate blind. The
-     * old loop re-ran the redirect ladder even after the target app had
-     * left the foreground entirely — the BACK rung then fired into the
-     * launcher/other apps and, on YouTube, the repeated BACKs summed
-     * into the double-back exit that threw the user out of the app. Now
-     * the loop only fights while [pkg] still owns a window; the moment
-     * the app is gone the episode simply closes (a fresh ENTRY later is
-     * a new attempt — the burst counter still catches rapid re-entry).
      */
     private fun scheduleEpisodeVerify(pkg: String) {
         val now = android.os.SystemClock.elapsedRealtime()
@@ -720,21 +691,13 @@ class DetoxAccessibilityService : AccessibilityService() {
             synchronized(reelsVerifyAt) { reelsVerifyAt[pkg] = 0L }
             try {
                 if (pkg !in ReelsDetector.SUPPORTED_PACKAGES) return@launch
-                if (application as? MldApp == null) return@launch
+                val app = application as? MldApp ?: return@launch
                 val lastAt = reelsLastAt[pkg] ?: return@launch
                 val vNow = android.os.SystemClock.elapsedRealtime()
                 if (vNow - lastAt > REELS_EPISODE_VERIFY_MAX_MS) return@launch
 
-                // App already gone from the screen? Nothing to fight for —
-                // close the episode and stop (no blind global actions).
-                val root = activeRootFor(pkg) ?: run {
-                    reelsOnSurface[pkg] = false
-                    DiagLog.log("REELS_EPISODE", "$pkg left the screen")
-                    return@launch
-                }
-
                 val stillThere = try {
-                    reelsDetector.detect(pkg, null, root) != null
+                    reelsDetector.detect(pkg, null, activeRootFor(pkg)) != null
                 } catch (_: Exception) {
                     true // transient read failure — keep the episode open
                 }
@@ -743,10 +706,16 @@ class DetoxAccessibilityService : AccessibilityService() {
                     DiagLog.log("REELS_EPISODE", "$pkg left the reels surface")
                 } else {
                     // The same screen survived the redirect — keep
-                    // fighting INSIDE the app (never HOME for feed apps;
-                    // navigateFromService rate-limits itself, r20).
-                    ReelsRedirect.navigateFromService(
-                        this@DetoxAccessibilityService, pkg)
+                    // fighting INSIDE the app (never HOME for feed apps).
+                    if (!ReelsRedirect.navigateFromService(
+                            this@DetoxAccessibilityService, pkg)
+                    ) {
+                        if (pkg in ReelsRedirect.NO_SAFE_SURFACE) {
+                            performGlobalAction(GLOBAL_ACTION_HOME)
+                            reelsOnSurface[pkg] = false
+                            return@launch
+                        }
+                    }
                     scheduleEpisodeVerify(pkg)
                 }
             } catch (_: Exception) {

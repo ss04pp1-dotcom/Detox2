@@ -284,6 +284,18 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Mld.Lock" />
 
+        <!-- Reels escalation surfaces: soft overlay (allowance unlocks)
+             and hard 10-second cooldown. -->
+        <activity
+            android:name=".reels.ReelsOverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Mld.Lock" />
+
         <!-- Safety pause: the calm full-screen countdown (friction, not
              blockade — releases itself). -->
         <activity
