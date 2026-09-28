@@ -90,7 +90,7 @@ abstract final class AppConstants {
   //   flutter build apk --dart-define=MLD_API_BASE=https://staging.../api/v1
   static const String apiBaseUrl = String.fromEnvironment(
     'MLD_API_BASE',
-    defaultValue: 'https://api.maxleveldetox.com/api/v1',
+    defaultValue: 'https://mld-api.salman61902.workers.dev/api/v1',
   );
 
   // --- Google Sign-In (v2.5.5 audit fix: the sign-in flow existed on the
