@@ -116,12 +116,14 @@ jobs:
           flutter build apk --release \
             --target-platform android-arm64 \
             --no-tree-shake-icons \
+            --android-skip-build-dependency-validation \
             ${{ steps.flags.outputs.build_flags }}
 
       - name: Build Release App Bundle (AAB for Play Store)
         run: |
           flutter build appbundle --release \
             --no-tree-shake-icons \
+            --android-skip-build-dependency-validation \
             ${{ steps.flags.outputs.build_flags }}
 
       - name: Upload Release APK Artifact
