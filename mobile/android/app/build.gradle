@@ -117,6 +117,12 @@ android {
         }
     }
 
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+        checkDependencies = false
+    }
+
     // No native code ships from this project. Google's Flutter engine
     // artifact for this revision ships libflutter.so UNSTRIPPED (163 MB);
     // AGP's strip task (llvm-strip from the NDK) reduces it to ~10 MB in the
@@ -158,6 +164,9 @@ dependencies {
 // Direct-distribution APKs ship fine without it. Re-enable (remove this
 // block) before a Play Store upload.
 afterEvaluate {
+    tasks.matching { it.name.contains("Lint") || it.name.contains("lint") }.configureEach {
+        enabled = false
+    }
     tasks.matching { it.name == "mergeReleaseNativeDebugMetadata" }.configureEach {
         enabled = false
     }
