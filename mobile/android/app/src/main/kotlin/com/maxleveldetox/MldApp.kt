@@ -231,6 +231,15 @@ class MldApp : Application() {
             } catch (_: Exception) {
             }
         }
+
+        // Initialize Firebase and subscribe to push notification broadcast topics
+        try {
+            com.google.firebase.FirebaseApp.initializeApp(this)
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().subscribeToTopic("all")
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().subscribeToTopic("announcements")
+        } catch (e: Exception) {
+            android.util.Log.w("MldApp", "Firebase init skipped", e)
+        }
     }
 
     companion object {

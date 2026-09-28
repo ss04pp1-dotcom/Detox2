@@ -146,6 +146,10 @@ dependencies {
     implementation "androidx.room:room-runtime:2.7.2"
     implementation "androidx.room:room-ktx:2.7.2"
     kapt "androidx.room:room-compiler:2.7.2"
+
+    // Firebase Push Notifications (FCM)
+    implementation platform("com.google.firebase:firebase-bom:33.7.0")
+    implementation "com.google.firebase:firebase-messaging"
 }
 
 // v2.7 r13 build note: native debug-symbol packaging (Play Console crash

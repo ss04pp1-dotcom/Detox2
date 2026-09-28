@@ -148,6 +148,15 @@
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="false" />
 
+        <!-- Firebase Cloud Messaging (Push Notifications) -->
+        <service
+            android:name=".push.MldFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- v2.3 r7: notification interception during enforcement (Monk
              Mode / Detox sessions) — a third blocking surface fully
              independent of both engines. User must grant Notification
