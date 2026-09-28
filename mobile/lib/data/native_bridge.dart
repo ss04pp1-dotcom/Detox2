@@ -923,7 +923,12 @@ class NativeBridge {
     return Map<String, dynamic>.from(r.data ?? const {});
   }
 
-  Future<Map<String, dynamic>?> activatePrimeCommit({
+  /// Activates a Prime commit. Returns null on success, or the REAL
+  /// native error message (v2.9.3 r19: pact not accepted / emergency
+  /// codes not enrolled / session active / permission missing must be
+  /// reported verbatim — the old generic "end any active session first"
+  /// guess misdiagnosed every failure).
+  Future<String?> activatePrimeCommit({
     required int hours,
     String title = 'Prime commit',
   }) async {
@@ -931,16 +936,14 @@ class NativeBridge {
       'commitHours': hours,
       'title': title,
     });
-    if (!r.isOk) return null;
-    return Map<String, dynamic>.from(r.data ?? const {});
+    return r.isOk ? null : (r.error?.message ?? 'Activation failed.');
   }
 
-  Future<Map<String, dynamic>?> giveUpPrimeCommit({String? code}) async {
-    final r = await call('giveUpPrimeCommit', {
-      if (code != null) 'code': code,
-    });
-    if (!r.isOk) return null;
-    return Map<String, dynamic>.from(r.data ?? const {});
+  /// Gives up the running Prime commit with a TOTP emergency code.
+  /// Returns null on success, or the native error message.
+  Future<String?> giveUpPrimeCommit({required String code}) async {
+    final r = await call('giveUpPrimeCommit', {'code': code});
+    return r.isOk ? null : (r.error?.message ?? 'Give-up failed.');
   }
 
   Future<Map<String, dynamic>?> getPrimeCommitStatus() async {

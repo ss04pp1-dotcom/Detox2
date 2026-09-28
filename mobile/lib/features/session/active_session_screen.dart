@@ -31,6 +31,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   StreamSubscription<DeviceState>? _watch;
   bool _hadSession = false;
 
+  // v2.9.3 r19 — PRIME OWNED SESSION: while a Prime commit owns this
+  // session the ONLY exit is the TOTP emergency code, and this locked
+  // surface is the user's whole world (the prime settings screen is
+  // unreachable from here) — so the give-up entry must live on THIS
+  // screen, or the promised exit does not exist at all.
+  bool _primeActive = false;
+  bool _primeBusy = false;
+
   // v2.5.5 audit fix: captured in didChangeDependencies (the legal seam for
   // inherited lookups) so the stream watcher below can check the bailout
   // suppression flag without an inherited lookup inside the listener.
@@ -40,6 +48,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   void initState() {
     super.initState();
     _hadSession = true; // this screen is only mounted for an active session
+    _checkPrime();
     _watch = NativeBridge.instance.stateStream.listen((s) {
       if (!mounted || !_hadSession) return;
       if (s.session == null || !s.session!.isActive) {
@@ -56,6 +65,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     });
   }
 
+  /// One-shot read: does a Prime commit own this session? (Checked on
+  /// mount only — the prime state cannot flip to active while a session
+  /// is already running, and expiry ends the session itself.)
+  Future<void> _checkPrime() async {
+    final status = await NativeBridge.instance.getPrimeCommitStatus();
+    if (!mounted) return;
+    final active = status?['active'] == true;
+    if (active != _primeActive) setState(() => _primeActive = active);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -65,6 +84,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   @override
   void dispose() {
     _watch?.cancel();
+    // v2.9.3 r19: never leave the completion-suppression flag latched —
+    // a natural later completion must still navigate normally.
+    _app?.suppressCompletionRedirect = false;
     super.dispose();
   }
 
@@ -181,6 +203,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   Expanded(child: MLDStatTile(label: 'Coins', value: '${app.state.coins}', accent: AppColors.warning)),
                 ],
               ),
+              if (_primeActive) ...[
+                const SizedBox(height: AppSpacing.md),
+                const MLDStatusChip(
+                  label: 'PRIME COMMIT — NO UNLOCKS, NO BAILOUTS',
+                  color: AppColors.prime,
+                ),
+              ],
               const SizedBox(height: AppSpacing.xxl),
 
               // Primary control row (v2.6 reference design: Pause / End / Details).
@@ -226,13 +255,25 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              MLDButton(
-                label: unlockActive
-                    ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)}'
-                    : 'TEMPORARY UNLOCK · 5 coins = 5 min',
-                icon: Icons.lock_open,
-                onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeTempUnlock),
-              ),
+              // v2.9.3 r19: while a Prime commit owns the session the
+              // temporary-unlock path is refused natively anyway — show
+              // the one real exit instead: the TOTP emergency give-up.
+              if (_primeActive)
+                MLDButton(
+                  label: 'END WITH EMERGENCY CODE',
+                  icon: Icons.military_tech_outlined,
+                  variant: MLDButtonVariant.danger,
+                  loading: _primeBusy,
+                  onPressed: _giveUpPrime,
+                )
+              else
+                MLDButton(
+                  label: unlockActive
+                      ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)}'
+                      : 'TEMPORARY UNLOCK · 5 coins = 5 min',
+                  icon: Icons.lock_open,
+                  onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeTempUnlock),
+                ),
               const SizedBox(height: AppSpacing.md),
 
               // Emergency is ALWAYS discoverable (PRD §27, UI/UX §88).
@@ -331,6 +372,81 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
     }
+  }
+
+  /// v2.9.3 r19 — the Prime give-up flow, reachable from the locked
+  /// session surface itself (see _primeActive). TOTP verified natively;
+  /// a relapse is NOT a celebration, so the completion redirect is
+  /// suppressed (same pattern as the bailout screen).
+  Future<void> _giveUpPrime() async {
+    if (_primeBusy) return;
+    final code = await _askEmergencyCode();
+    if (!mounted || code == null) return;
+    setState(() => _primeBusy = true);
+
+    // Latch the suppression BEFORE the await — the native state push and
+    // the method-channel reply are separate async events (bailout race
+    // lesson, v2.5.5).
+    final app = _app ?? AppStateScope.of(context);
+    _app = app;
+    app.suppressCompletionRedirect = true;
+
+    final error = await NativeBridge.instance.giveUpPrimeCommit(code: code);
+    if (!mounted) {
+      app.suppressCompletionRedirect = false;
+      return;
+    }
+    if (error != null) {
+      app.suppressCompletionRedirect = false;
+      setState(() => _primeBusy = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    // Ended — a relapse goes straight home, no celebration.
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppConstants.routeShell,
+      (route) => false,
+    );
+  }
+
+  /// TOTP emergency-code dialog (same flow as the Prime screen).
+  Future<String?> _askEmergencyCode() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Emergency code'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+                'Enter the CURRENT 6-digit code from your emergency sheet. '
+                'Each code works once for 5 minutes.\n\nGiving up resets '
+                'your streak to Day 1.'),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                  border: OutlineInputBorder(), counterText: ''),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Use code')),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   String _fmt(int s) {
@@ -496,7 +612,13 @@ class _CageView extends StatelessWidget {
     final app = AppStateScope.of(context);
     final cage = app.state.cage;
 
-    return Scaffold(
+    // v2.9.3 r19: the cage view gets the same back-seal as the session
+    // view — it had NO PopScope, so a back press could bubble out of the
+    // root route and exit the app (leaving the cage behind on the
+    // launcher was the only "escape").
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       backgroundColor: AppColors.cageBackground,
       body: SafeArea(
         child: Padding(
@@ -547,6 +669,7 @@ class _CageView extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

@@ -78,6 +78,10 @@ class DetoxAccessibilityService : AccessibilityService() {
         // apps; replaces the removed screen-pinning approach).
         com.maxleveldetox.overlay.SessionKiosk.bind(this)
 
+        // v2.9.3 r19: bind the hard SAFETY PAUSE overlay (cage-hold countdown
+        // — same TYPE_ACCESSIBILITY_OVERLAY mechanism as the kiosk wall).
+        com.maxleveldetox.overlay.SafetyPauseOverlay.bind(this)
+
         // v2.9.2 r18: KIOSK ASSERT LOOP — a session started while our own
         // app was already foreground produces no window event, and OEMs
         // occasionally strip overlay windows. This 2 s heartbeat re-arms
@@ -333,12 +337,29 @@ class DetoxAccessibilityService : AccessibilityService() {
 
                 // SAFETY PAUSE (Phase B4): a chosen moment of friction
                 // before configured apps — outside any block decision.
+                // v2.9.3 r19 (user-requested HARD pause): the surface is
+                // the cage-hold OVERLAY first (full-screen a11y window —
+                // home/recents/shade/back all dead while it counts down);
+                // the legacy activity remains only as an add-failure
+                // fallback so a pause can never silently vanish.
                 if (decision == PolicyDecision.ALLOW &&
                     app.safetyPause.shouldPause(pkg)) {
                     app.safetyPause.recordShown(pkg)
-                    try {
-                        startActivity(SafetyPauseActivity.intentFor(this, pkg))
+                    val seconds = try {
+                        app.safetyPause.statePauseSeconds()
                     } catch (_: Exception) {
+                        5
+                    }
+                    val shown = try {
+                        com.maxleveldetox.overlay.SafetyPauseOverlay.show(this, pkg, seconds)
+                    } catch (_: Exception) {
+                        false
+                    }
+                    if (!shown) {
+                        try {
+                            startActivity(SafetyPauseActivity.intentFor(this, pkg))
+                        } catch (_: Exception) {
+                        }
                     }
                 }
             }
@@ -781,6 +802,9 @@ class DetoxAccessibilityService : AccessibilityService() {
         if (com.maxleveldetox.overlay.SessionKiosk.isWallShowing() ||
             com.maxleveldetox.overlay.SessionKiosk.isStripShowing()
         ) return true
+        // v2.9.3 r19: the hard safety-pause countdown holds like the cage —
+        // while it is on screen the navigation keys are dead.
+        if (com.maxleveldetox.overlay.SafetyPauseOverlay.isShowing()) return true
         val app = application as? MldApp
         val session = try { app?.stateRepo?.blockingSession() } catch (_: Exception) { null }
         if (session != null && session.status.isEnforcing) return true
@@ -846,6 +870,7 @@ class DetoxAccessibilityService : AccessibilityService() {
         // removes a11y overlay windows when the service dies anyway).
         EnforcementWall.unbind()
         com.maxleveldetox.overlay.SessionKiosk.unbind()
+        com.maxleveldetox.overlay.SafetyPauseOverlay.unbind()
         A11yOverlayController.hide(this)
         scope.cancel()
         super.onDestroy()

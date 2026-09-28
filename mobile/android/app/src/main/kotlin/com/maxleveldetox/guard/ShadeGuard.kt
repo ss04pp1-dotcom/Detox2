@@ -107,6 +107,9 @@ object ShadeGuard {
         if (com.maxleveldetox.overlay.SessionKiosk.isWallShowing() ||
             com.maxleveldetox.overlay.SessionKiosk.isStripShowing()
         ) return true
+        // v2.9.3 r19: the hard safety-pause countdown is a live
+        // enforcement surface — the shade cannot open over it.
+        if (com.maxleveldetox.overlay.SafetyPauseOverlay.isShowing()) return true
         return try {
             val session = app.stateRepo.blockingSession()
             if (session != null && session.status.isEnforcing) return true

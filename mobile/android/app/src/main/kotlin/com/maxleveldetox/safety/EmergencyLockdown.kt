@@ -63,6 +63,12 @@ object EmergencyLockdown {
             com.maxleveldetox.overlay.SessionKiosk.hideAll(context)
         } catch (_: Exception) {
         }
+        // v2.9.3 r19: the hard safety-pause countdown stands down too —
+        // the dialer owns the screen while the lockdown lasts.
+        try {
+            com.maxleveldetox.overlay.SafetyPauseOverlay.hide()
+        } catch (_: Exception) {
+        }
         DiagLog.log("EMERGENCY_LOCKDOWN", "started")
     }
 

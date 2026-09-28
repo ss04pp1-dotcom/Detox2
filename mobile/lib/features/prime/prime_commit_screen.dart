@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/constants.dart';
 import '../../core/theme/tokens.dart';
 import '../../data/native_bridge.dart';
 import '../../shared/mld_timer.dart';
@@ -77,14 +78,25 @@ class _PrimeCommitScreenState extends State<PrimeCommitScreen> {
     // v2.5.5 audit fix: mounted guard between the dialog await and setState.
     if (!mounted || confirmed != true) return;
     setState(() => _busy = true);
-    final result =
+    // v2.9.3 r19: the bridge now returns the REAL native error (pact not
+    // accepted / emergency codes not enrolled / session active / missing
+    // permission) — the old generic "end any active session first" toast
+    // misdiagnosed every one of those failures.
+    final error =
         await NativeBridge.instance.activatePrimeCommit(hours: _hours);
     if (!mounted) return;
     setState(() => _busy = false);
-    if (result != null) {
+    if (error != null) {
+      _toast(error);
       _load();
     } else {
-      _toast('Activation failed — end any active session first.');
+      // The commit owns a locked DETOX session — land the user on that
+      // hard session surface immediately (r19: staying here left the
+      // pre-lock screen navigable, which felt like nothing had locked).
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppConstants.routeActiveSession,
+        (route) => false,
+      );
     }
   }
 
@@ -93,11 +105,13 @@ class _PrimeCommitScreenState extends State<PrimeCommitScreen> {
     // v2.5.5 audit fix: mounted guard between the dialog await and setState.
     if (!mounted || code == null) return;
     setState(() => _busy = true);
-    final result = await NativeBridge.instance.giveUpPrimeCommit(code: code);
+    // v2.9.3 r19: surface the real native error (invalid / replayed /
+    // expired code) instead of a hardcoded guess.
+    final error = await NativeBridge.instance.giveUpPrimeCommit(code: code);
     if (!mounted) return;
     setState(() => _busy = false);
-    if (result == null) {
-      _toast('Invalid or replayed code. Try the next one from your sheet.');
+    if (error != null) {
+      _toast(error);
     } else {
       _toast('Commitment ended. Relapse logged — streak reset to Day 1.');
       _load();

@@ -26,22 +26,36 @@ class MainActivity : FlutterActivity() {
     private var bridge: NativeBridge? = null
 
     // ------------------------------------------------------------------
-    // v2.9.2 r18 (user-requested): while the SESSION KIOSK is armed the
-    // session screen itself holds the user like the cage — the BACK key
-    // AND the gesture-back are consumed right here (the manifest pins
-    // enableOnBackInvokedCallback=false, so the classic path is the one
-    // the OS uses on every API level). Evaluated at press time — always
-    // fresh, no polling, no I/O.
+    // v2.9.3 r19 (user-reported fix): the BACK consumption is now STATE
+    // based, not window based. r18 consumed only while kiosk surfaces
+    // were literally on screen (isWallShowing/isStripShowing) — if the
+    // strips were missing for even a moment (OEM overlay rejection,
+    // add-race, ticker disarm glitch), the back press fell through to
+    // FlutterActivity → the app left the foreground → the kiosk WALL
+    // appeared over the launcher ("back works, then the study lock screen
+    // comes" — exactly the user's report). Now the press consults the
+    // SESSION STATE itself: while a session is actively enforcing
+    // (Study / Detox / Prime-owned) or any enforcement surface is live,
+    // BACK is consumed right here, window state irrelevant. Evaluated
+    // at press time — always fresh. (manifest pins
+    // enableOnBackInvokedCallback=false, so this classic path is the
+    // one the OS uses on every API level.)
     // ------------------------------------------------------------------
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         val locked = try {
             com.maxleveldetox.overlay.SessionKiosk.isWallShowing() ||
-                com.maxleveldetox.overlay.SessionKiosk.isStripShowing()
+                com.maxleveldetox.overlay.SessionKiosk.isStripShowing() ||
+                // The decisive check: a session is ENFORCING right now
+                // (ACTIVE, no temp-unlock / grace / emergency window).
+                com.maxleveldetox.overlay.SessionKiosk.isArmed(this) ||
+                // Block walls + cage: the same hold applies.
+                com.maxleveldetox.overlay.EnforcementWall.isShowing() ||
+                com.maxleveldetox.overlay.EnforcementWall.isCageActive()
         } catch (_: Exception) {
             false
         }
-        if (locked) return // consumed — kiosk armed: NOTHING happens
+        if (locked) return // consumed — nothing happens
         super.onBackPressed()
     }
 
