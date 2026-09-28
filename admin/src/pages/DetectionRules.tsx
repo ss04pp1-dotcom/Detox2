@@ -49,8 +49,6 @@ const PLATFORM_ORDER: DetectionPlatformId[] = [
   'facebook',
   'facebook_lite',
   'instagram',
-  'chrome',
-  'chrome_beta',
 ];
 
 const PLATFORM_LABELS: Record<DetectionPlatformId, string> = {
@@ -59,8 +57,6 @@ const PLATFORM_LABELS: Record<DetectionPlatformId, string> = {
   facebook: 'Facebook (Reels)',
   facebook_lite: 'Facebook Lite',
   instagram: 'Instagram (Reels, full + lite)',
-  chrome: 'Chrome (URL shapes)',
-  chrome_beta: 'Chrome Beta (URL shapes)',
 };
 
 function rid(err: unknown): string | undefined {
@@ -274,7 +270,7 @@ export default function DetectionRulesPage(): JSX.Element {
                               .filter((line) => line.length > 0),
                           })
                         }
-                        placeholder={field.key === 'urlShapes' ? 'youtube.com/shorts' : 'reel_watch_fragment_root'}
+                        placeholder="reel_watch_fragment_root"
                       />
                     </Field>
                   ))}

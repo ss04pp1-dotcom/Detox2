@@ -54,7 +54,6 @@ object EnforcementWall {
     const val KIND_BLOCKED = "BLOCKED"
     const val KIND_HARD = "HARD"
     const val KIND_CAGE = "CAGE"
-    const val KIND_SHORTS_LOCKOUT = "SHORTS_LOCKOUT"
 
     private const val HARD_GATE_SECONDS = 10
     private const val EMERGENCY_WINDOW_MS = 90_000L
@@ -86,14 +85,20 @@ object EnforcementWall {
     /** True when any wall overlay is currently on screen. */
     fun isShowing(): Boolean = overlay != null
 
-    /** True while the cage lockout is running. */
+    /**
+     * True while the cage lockout is running.
+     *
+     * v2.9.4 r20: IN-MEMORY ONLY. The old fallback also consulted the
+     * PERSISTED cage snapshot — a leftover 30-minute cage from a previous
+     * install (or one warped by an elapsedRealtime reset across reboot)
+     * kept "reasserting the cage" over every app for hours/days after
+     * the user had long left shorts ("hut kore bondi korlo — ami Chrome-e
+     * chilam, shorts dekhchilam na"). The only production cage now is
+     * the 60 s in-memory burst cage; legacy persisted cages are cleared
+     * at recovery (SessionEngine.recoverIfNeeded).
+     */
     fun isCageActive(): Boolean {
-        val now = SystemClockNow.elapsed
-        if (cageEndElapsed > now) return true
-        val cage = try {
-            (serviceRef?.application as? MldApp)?.stateRepo?.blockingCage()
-        } catch (_: Exception) { null }
-        return cage != null && !cage.isExpired(now)
+        return cageEndElapsed > SystemClockNow.elapsed
     }
 
     fun getCageEndElapsed(): Long = cageEndElapsed
@@ -127,14 +132,6 @@ object EnforcementWall {
     fun showCage(service: AccessibilityService, endElapsed: Long) {
         cageEndElapsed = endElapsed
         show(service, KIND_CAGE, "", "")
-    }
-
-    /** Reels/shorts hard lockout — same gate as HARD, punishment copy. */
-    fun showShortsLockout(service: AccessibilityService, pkg: String, count: Int) {
-        show(
-            service, KIND_SHORTS_LOCKOUT, pkg,
-            "Short-form lockout #$count.\nRepeated attempts escalate further.",
-        )
     }
 
     // -----------------------------------------------------------------
@@ -178,7 +175,6 @@ object EnforcementWall {
 
         val accent = when (kind) {
             KIND_CAGE -> Color.parseColor("#EF4444")
-            KIND_SHORTS_LOCKOUT -> Color.parseColor("#EF4444")
             else -> Color.parseColor("#6366F1")
         }
 
@@ -220,11 +216,6 @@ object EnforcementWall {
                 root.addView(timerView)
                 root.addView(body("Repeated violations detected.\nThe restriction is temporarily intensified."))
                 root.addView(body("The cage opens automatically at zero."))
-            }
-            KIND_SHORTS_LOCKOUT -> {
-                root.addView(title("SHORTS LOCKED"))
-                root.addView(timerView)
-                root.addView(body(message))
             }
             KIND_HARD -> {
                 root.addView(title("ACCESS BLOCKED"))
@@ -353,25 +344,14 @@ object EnforcementWall {
                     val now = SystemClockNow.elapsed
                     when (kind) {
                         KIND_CAGE -> {
-                            val remaining = if (cageEndElapsed > 0L) {
-                                ((cageEndElapsed - now) / 1000L).coerceAtLeast(0L).toInt()
-                            } else {
-                                val cage = app?.stateRepo?.blockingCage()
-                                if (cage == null || cage.isExpired(now)) 0 else cage.remainingSeconds(now)
-                            }
+                            val remaining = ((cageEndElapsed - now) / 1000L)
+                                .coerceAtLeast(0L).toInt()
                             if (remaining <= 0) {
                                 cageEndElapsed = 0L
                                 hideInternal()
                                 return
                             }
                             timerView.text = formatSeconds(remaining)
-                        }
-                        KIND_SHORTS_LOCKOUT -> {
-                            timerView.text = formatSeconds(shortsLockoutRemaining(now))
-                            if (shortsLockoutRemaining(now) <= 0) {
-                                hideInternal()
-                                return
-                            }
                         }
                         else -> {
                             val session = app?.stateRepo?.blockingSession()
@@ -392,15 +372,6 @@ object EnforcementWall {
         }
         ticker = t
         handler.post(t)
-    }
-
-    // Shorts lockout window: 60 s from the moment the wall appeared.
-    private var shortsLockoutEndElapsed = 0L
-    private fun shortsLockoutRemaining(now: Long): Int {
-        if (shortsLockoutEndElapsed == 0L) {
-            shortsLockoutEndElapsed = now + 60_000L
-        }
-        return ((shortsLockoutEndElapsed - now) / 1000L).coerceAtLeast(0L).toInt()
     }
 
     private fun formatSeconds(total: Int): String {
@@ -434,7 +405,6 @@ object EnforcementWall {
     private fun hideInternal() {
         ticker?.let { handler.removeCallbacks(it) }
         ticker = null
-        shortsLockoutEndElapsed = 0L
         // v2.5.5 audit fix m-5: clear the state fields BEFORE the serviceRef
         // bail-out — after unbind() (service death) the old code returned
         // early with overlay != null, so isShowing() lied until the next
@@ -469,7 +439,7 @@ object EnforcementWall {
     fun reconcile(service: AccessibilityService, foregroundPkg: String?) {
         if (overlay == null) return
         val kind = overlayKind ?: return
-        if (kind == KIND_CAGE || kind == KIND_SHORTS_LOCKOUT) return
+        if (kind == KIND_CAGE) return
         if (foregroundPkg != null && foregroundPkg != overlayPkg) {
             hide()
         }

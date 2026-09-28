@@ -8,67 +8,50 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.maxleveldetox.accessibility.DiagLog
 
 /**
- * ReelsRedirect (v2.7 r13) — user-requested UX change for shorts/reels
- * interception: when a feed is detected, STAY INSIDE THE APP and navigate
- * to its safe surface (YouTube -> Home, Facebook -> Feed, Instagram ->
- * Feed). The old GLOBAL_ACTION_HOME kick-out becomes the last-resort
- * fallback only.
+ * ReelsRedirect (v2.7 r13 → v2.9.4 r20) — user-requested UX for
+ * shorts/reels interception: when a feed is detected, STAY INSIDE THE
+ * APP and navigate to its safe surface (YouTube -> Home, Facebook ->
+ * Feed, Instagram -> Feed). The user is NEVER kicked out of a feed
+ * platform.
  *
- * Ladder (v2.9 r16 — closed-loop, per platform, one rung per detection):
- *   0. RUNG 1 — BACK PRESS: immersive reels/shorts players (Facebook
- *      Reels, YouTube Shorts, Instagram Reels) are fullscreen surfaces ON
- *      TOP of the app's own feed/home — Android's BACK closes the player
- *      and lands on the feed. This is the most reliable in-app redirect
- *      (it is exactly what a manual user does) and needs no tree walk.
- *   1. RUNG 2 — NODE CLICK — find the app's own bottom-nav "Home" tab in
- *      the active window tree and click it (partial-player states where
- *      the nav bar is still visible).
- *   2. RUNG 3 — ROOT REVISIT — launch the app's own launcher intent with
- *      CLEAR_TOP|SINGLE_TOP. The app's root activity comes forward and
- *      everything stacked above it is finished. Same app, same task.
- *
- * v2.9.2 r18 (user-requested): the caller NEVER kicks the user out of a
- * feed platform — when every rung fails it re-arms the closed loop
- * (scheduled re-scans + episode verification keep fighting INSIDE the
- * app). HOME remains correct ONLY for platforms with no safe in-app
- * surface at all (TikTok: the whole app IS the feed; Chrome: a shorts
- * URL is just a tab) — see NO_SAFE_SURFACE.
- *
- * CLOSED LOOP: the a11y service's scheduled re-scans (+500/+1500/
- * +3000/+5000/+8000 ms) and the episode verification loop re-run
- * detection after every redirect, so a redirect that DIDN'T stick (the
- * old Facebook bug: root-revisit reported success but the reels screen
- * survived) automatically retries instead of silently winning.
+ * v2.9.4 r20 (user-reported regression fix): the old universal
+ * "BACK-first" ladder caused two real bugs on device —
+ *   (a) when Shorts was the app's ROOT surface (launcher shortcut /
+ *       restored task), BACK did not close the player; the r18
+ *       closed-loop kept pressing BACK every ~900 ms until YouTube's
+ *       double-back-to-exit fired and the user was thrown OUT of the
+ *       app ("ekdom app theke bair kore dicche");
+ *   (b) the redirect machine-gun made single volume presses look like
+ *       several presses.
+ * The ladder is now PER PLATFORM and rate-limited:
+ *   - youtube / instagram (+ lite): bottom-nav HOME TAB first (the
+ *     pivot/tab bar is visible on the shorts/reels surface — this is
+ *     exactly "go back to the app's feed"), then root revisit, and BACK
+ *     only as the LAST rung (it is the only rung that can exit the app).
+ *   - facebook (+ lite): BACK first (the reels player is fullscreen and
+ *     hides the nav bar — BACK is the only thing that closes it; FB
+ *     always opens on the feed, so the root-exit risk is negligible),
+ *     then Home tab, then root revisit.
+ *   - A per-package rate limit (min 2 s between navigate attempts) stops
+ *     any caller — content events, scheduled re-scans, the episode
+ *     verifier — from hammering rungs.
  *
  * SECURITY: this navigates the TARGET app only. It never weakens the
- * escalation ladder, quotas, debounces or violation recording — those are
- * untouched (rules swap signatures only, TRD §34–35).
+ * escalation ladder, quotas, debounces or violation recording (TRD
+ * §34–35).
  */
 object ReelsRedirect {
 
-    /** v2.9 r16 — closed-loop rung bookkeeping (per package). Rung 1 =
-     * BACK, 2 = click Home tab, 3 = root revisit, 4+ = caller's HOME
-     * fallback. Reset after RUNG_RESET_MS without a new detection. */
-    private val rungs = HashMap<String, Int>()
-    private val rungAt = HashMap<String, Long>()
-    private const val RUNG_RESET_MS = 20_000L
-
-    private fun advanceRung(pkg: String): Int {
-        val now = android.os.SystemClock.elapsedRealtime()
-        synchronized(rungs) {
-            if (now - (rungAt[pkg] ?: 0L) > RUNG_RESET_MS) rungs[pkg] = 0
-            rungAt[pkg] = now
-            val r = (rungs[pkg] ?: 0) + 1
-            rungs[pkg] = r
-            return r
-        }
-    }
-
-    /** Forget the ladder (e.g. the user disabled the shorts blocker). */
-    fun reset(pkg: String) = synchronized(rungs) {
-        rungs.remove(pkg)
-        rungAt.remove(pkg)
-    }
+    /**
+     * Platforms with no safe in-app surface — the whole app IS the feed,
+     * so leaving it (HOME) is the only correct redirect. Browsers are
+     * NOT listed any more: browser URL detection was removed entirely
+     * in r20 (false-positive source, never user-requested).
+     */
+    val NO_SAFE_SURFACE = setOf(
+        DetectionRules.PKG_TIKTOK,
+        DetectionRules.PKG_TIKTOK_REGIONAL,
+    )
 
     /** Bottom-nav tab labels worth clicking, per platform. Exact match on
      *  the trimmed label (so "Home" never matches "Homescreen"); English
@@ -81,62 +64,90 @@ object ReelsRedirect {
         DetectionRules.PKG_INSTAGRAM_LITE to listOf("Home", "হোম"),
     )
 
-    /** Platforms with no safe in-app surface — HOME (or the caller's own
-     *  fallback) is correct for these. */
-    val NO_SAFE_SURFACE = setOf(
-        DetectionRules.PKG_TIKTOK,
-        DetectionRules.PKG_TIKTOK_REGIONAL,
-        DetectionRules.PKG_CHROME,
-        DetectionRules.PKG_CHROME_BETA,
+    /**
+     * r20 — per-package redirect order. Keyed by package; default order
+     * for unlisted feed platforms is BACK -> tab -> revisit (the classic
+     * fullscreen-player shape).
+     */
+    private val LADDER: Map<String, List<Rung>> = mapOf(
+        DetectionRules.PKG_YOUTUBE to
+            listOf(Rung.HOME_TAB, Rung.ROOT_REVISIT, Rung.BACK),
+        DetectionRules.PKG_INSTAGRAM to
+            listOf(Rung.HOME_TAB, Rung.ROOT_REVISIT, Rung.BACK),
+        DetectionRules.PKG_INSTAGRAM_LITE to
+            listOf(Rung.HOME_TAB, Rung.ROOT_REVISIT, Rung.BACK),
+        DetectionRules.PKG_FACEBOOK to
+            listOf(Rung.BACK, Rung.HOME_TAB, Rung.ROOT_REVISIT),
+        DetectionRules.PKG_FACEBOOK_LITE to
+            listOf(Rung.BACK, Rung.HOME_TAB, Rung.ROOT_REVISIT),
     )
 
-    /** BFS budget — a launcher tree walk is bounded so a pathological
-     *  deep layout can never stall the a11y hot path. */
+    private enum class Rung { HOME_TAB, ROOT_REVISIT, BACK }
+
+    /** BFS budget — a tree walk is bounded so a pathological deep layout
+     *  can never stall the a11y hot path. */
     private const val MAX_NODES = 800
+
+    // -----------------------------------------------------------------
+    // Rate limit (r20) — one navigate attempt per package per window.
+    // Without this, content events + re-scans + the episode verifier
+    // together injected a global action every ~500 ms (the machine-gun
+    // that exited apps and garbled volume presses).
+    // -----------------------------------------------------------------
+
+    private val lastNavigateAt = HashMap<String, Long>()
+    private const val NAVIGATE_MIN_INTERVAL_MS = 2_000L
+
+    /** True when a navigate attempt for [pkg] is allowed right now. */
+    fun canNavigateNow(pkg: String): Boolean {
+        val now = android.os.SystemClock.elapsedRealtime()
+        synchronized(lastNavigateAt) {
+            return now - (lastNavigateAt[pkg] ?: 0L) >= NAVIGATE_MIN_INTERVAL_MS
+        }
+    }
+
+    private fun markNavigated(pkg: String) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        synchronized(lastNavigateAt) { lastNavigateAt[pkg] = now }
+    }
 
     // -----------------------------------------------------------------
     // Entry points
     // -----------------------------------------------------------------
 
     /**
-     * From the accessibility service (has the node tree). Returns TRUE when
-     * the user was kept inside the app (a rung succeeded) — the caller
-     * should then SKIP its GLOBAL_ACTION_HOME fallback. Rung 4 returns
-     * false on purpose: after three failed in-app attempts the caller's
-     * HOME kick-out is the honest answer.
+     * From the accessibility service (has the node tree). Returns TRUE
+     * when a rung succeeded — the caller must NOT apply any fallback.
+     * Rate-limited: when the interval has not elapsed the call is a
+     * no-op returning FALSE (the closed loop retries on the next event).
      */
     fun navigateFromService(service: AccessibilityService, pkg: String): Boolean {
         if (pkg in NO_SAFE_SURFACE) return false
+        if (!canNavigateNow(pkg)) return false
 
-        // 1. BACK press: immediately pops the fullscreen reel/shorts viewer back to Feed/Home
-        if (tryBackPress(service)) return true
-
-        // 2. Click Home/Feed bottom-nav tab in the app
-        if (tryClickHomeTab(service, pkg)) return true
-
-        // 3. Revisit root activity with CLEAR_TOP (stays inside app)
-        if (tryRevisitRoot(service, pkg)) return true
-
+        for (rung in LADDER[pkg] ?: DEFAULT_LADDER) {
+            val ok = when (rung) {
+                Rung.HOME_TAB -> tryClickHomeTab(service, pkg)
+                Rung.ROOT_REVISIT -> tryRevisitRoot(service, pkg)
+                Rung.BACK -> tryBackPress(service)
+            }
+            if (ok) {
+                markNavigated(pkg)
+                return true
+            }
+        }
+        markNavigated(pkg) // failed round — still rate-limit the retries
         return false
     }
 
-    /**
-     * From any context (no node tree — e.g. the escalation manager after
-     * the hard-lockout countdown). Root revisit only; returns FALSE when
-     * the caller should apply its own fallback.
-     */
-    fun navigateFromContext(context: Context, pkg: String): Boolean {
-        if (pkg in NO_SAFE_SURFACE) return false
-        return tryRevisitRoot(context, pkg)
-    }
+    private val DEFAULT_LADDER = listOf(Rung.BACK, Rung.HOME_TAB, Rung.ROOT_REVISIT)
 
     // -----------------------------------------------------------------
-    // Rung 1 — BACK press closes the immersive player
+    // Rung — BACK press closes the immersive player (LAST resort for
+    // youtube/instagram: the only rung that can exit the app when the
+    // player is the task root).
     // -----------------------------------------------------------------
 
-    /** A consumed BACK = the player is dismissing (feed lands behind it).
-     *  Returns false only when the system refused the action — then the
-     *  caller immediately tries the next rung (same invocation). */
     private fun tryBackPress(service: AccessibilityService): Boolean {
         return try {
             val consumed = service.performGlobalAction(
@@ -149,7 +160,7 @@ object ReelsRedirect {
     }
 
     // -----------------------------------------------------------------
-    // Rung 2 — click the app's own Home tab
+    // Rung — click the app's own Home/Feed tab
     // -----------------------------------------------------------------
 
     private fun tryClickHomeTab(service: AccessibilityService, pkg: String): Boolean {
@@ -213,7 +224,7 @@ object ReelsRedirect {
     }
 
     // -----------------------------------------------------------------
-    // Rung 3 — revisit the app's root activity (still the same app)
+    // Rung — revisit the app's root activity (still the same app)
     // -----------------------------------------------------------------
 
     private fun tryRevisitRoot(context: Context, pkg: String): Boolean {

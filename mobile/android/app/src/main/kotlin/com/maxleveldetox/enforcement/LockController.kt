@@ -74,27 +74,21 @@ object LockController {
         show(context, LockScreenActivity.KIND_WARNING, "", count, limit)
     }
 
-    fun cage(context: Context) {
-        // v2.5 r9: when called from the accessibility service, the cage
-        // surfaces on the overlay wall (above system bars — no home/shade
-        // escape). Engine-2 / non-a11y callers fall through to the
-        // activity surface.
-        val endElapsed = try {
-            val app = context.applicationContext as? MldApp
-            val cage = app?.stateRepo?.blockingCage()
-            val now = SystemClockNow.elapsed
-            if (cage != null && cage.active && !cage.isExpired(now)) {
-                now + cage.remainingSeconds(now) * 1000L
-            } else now + 30 * 60 * 1000L
-        } catch (_: Exception) {
-            SystemClockNow.elapsed + 30 * 60 * 1000L
-        }
+    /**
+     * v2.9.4 r20 — cage surface with an EXPLICIT end (elapsedRealtime).
+     * The caller owns the duration (the reels burst cage passes 60 s;
+     * debug tooling passes its own). The old parameterless version fell
+     * back to a 30-MINUTE default when no persisted cage existed — one
+     * of the zombie-cage sources (a cage that outlived its reason and
+     * reasserted itself over every app switch).
+     */
+    fun cage(context: Context, endElapsed: Long) {
         val svc = context as? android.accessibilityservice.AccessibilityService
         if (svc != null && EnforcementWall.isBound()) {
             EnforcementWall.showCage(svc, endElapsed)
             return
         }
-        show(context, LockScreenActivity.KIND_CAGE, "")
+        show(context, LockScreenActivity.KIND_CAGE, "", cageEndElapsed = endElapsed)
     }
 
     private fun show(
@@ -105,6 +99,7 @@ object LockController {
         warningLimit: Int = 0,
         hard: Boolean = false,
         message: String? = null,
+        cageEndElapsed: Long = 0L,
     ) {
         com.maxleveldetox.accessibility.DiagLog.log("LOCK_SHOW", "kind=$kind pkg=$pkg hard=$hard")
         val intent = Intent(context, LockScreenActivity::class.java).apply {
@@ -116,6 +111,7 @@ object LockController {
             putExtra(LockScreenActivity.EXTRA_WARNING_COUNT, warningCount)
             putExtra(LockScreenActivity.EXTRA_WARNING_LIMIT, warningLimit)
             putExtra(LockScreenActivity.EXTRA_HARD, hard)
+            putExtra(LockScreenActivity.EXTRA_CAGE_END_ELAPSED, cageEndElapsed)
             if (message != null) {
                 putExtra(LockScreenActivity.EXTRA_MESSAGE, message)
             }
@@ -144,6 +140,9 @@ class LockScreenActivity : Activity() {
     private var hardMode = false
     private var customMessage: String? = null
 
+    /** v2.9.4 r20 — explicit cage end from the caller (elapsedRealtime). */
+    private var cageEndElapsedExtra: Long = 0L
+
     // v2.3 r7 home-trap state: set when the user legitimately leaves this
     // surface (dismiss button / session end) — otherwise onPause re-asserts
     // the wall while enforcement is live (Social Sentry dual-surface loop).
@@ -159,6 +158,7 @@ class LockScreenActivity : Activity() {
         warningLimit = intent?.getIntExtra(EXTRA_WARNING_LIMIT, 5) ?: 5
         hardMode = intent?.getBooleanExtra(EXTRA_HARD, false) ?: false
         customMessage = intent?.getStringExtra(EXTRA_MESSAGE)
+        cageEndElapsedExtra = intent?.getLongExtra(EXTRA_CAGE_END_ELAPSED, 0L) ?: 0L
 
         // Show over the lock screen, keep the screen honest.
         setShowWhenLocked(true)
@@ -372,13 +372,20 @@ class LockScreenActivity : Activity() {
             val app = application as? MldApp ?: return
             val now = SystemClockNow.elapsed
             val session = app.stateRepo.blockingSession()
-            val cage = app.stateRepo.blockingCage()
 
             when (kind) {
                 LockControllerKind.CAGE.name -> {
-                    val remaining = cage.remainingSeconds(now)
+                    // v2.9.4 r20: the caller passes the cage end explicitly
+                    // (the 60 s burst cage). The persisted-cage read stays
+                    // only as the legacy/debug fallback.
+                    val remaining = if (cageEndElapsedExtra > now) {
+                        ((cageEndElapsedExtra - now) / 1000L).toInt()
+                    } else {
+                        val cage = app.stateRepo.blockingCage()
+                        if (cage.active && !cage.isExpired(now)) cage.remainingSeconds(now) else 0
+                    }
                     timerView?.text = SessionEngine.formatSeconds(remaining)
-                    if (cage.isExpired(now)) {
+                    if (remaining <= 0) {
                         finish()
                         return
                     }
@@ -448,6 +455,7 @@ class LockScreenActivity : Activity() {
                     putExtra(EXTRA_WARNING_COUNT, warningCount)
                     putExtra(EXTRA_WARNING_LIMIT, warningLimit)
                     putExtra(EXTRA_HARD, hardMode)
+                    putExtra(EXTRA_CAGE_END_ELAPSED, cageEndElapsedExtra)
                     if (customMessage != null) putExtra(EXTRA_MESSAGE, customMessage)
                 })
             } catch (_: Exception) {
@@ -538,6 +546,7 @@ class LockScreenActivity : Activity() {
         const val EXTRA_WARNING_LIMIT = "warningLimit"
         const val EXTRA_HARD = "hard"
         const val EXTRA_MESSAGE = "message"
+        const val EXTRA_CAGE_END_ELAPSED = "cageEndElapsed"
 
         /** v2.3 r7: hard-surface dismissal gate. */
         const val HARD_GATE_SECONDS = 10
