@@ -6,7 +6,7 @@ abstract final class AppConstants {
   static const String tagline = 'TAKE BACK CONTROL';
   // v2.5.5 audit fix: bumped with the audit-fix release (android versionCode
   // 21 / versionName 2.5.6 in app/build.gradle already match).
-  static const String appVersion = '2.9.5';
+  static const String appVersion = '2.9.6';
 
   // --- Navigation route names ---
   static const String routeSplash = '/';

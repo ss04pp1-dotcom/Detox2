@@ -81,23 +81,50 @@ describe('validateDetectionRules (dynamic remote rule config)', () => {
     expect(good.ok).toBe(true);
   });
 
-  it('lowercases urlShapes and enforces their charset', () => {
+  it('lowercases legacy urlShapes entries and enforces their charset', () => {
+    // v2.9.4 r20: the URL strategy is gone from the app; urlShapes remains
+    // an ACCEPTED legacy key on the remaining platforms so old stored docs
+    // still validate — but it no longer counts as a signature.
     const good = validateDetectionRules({
       schemaVersion: 1,
       minAppVersion: '1.0.0',
-      platforms: { chrome: { enabled: true, urlShapes: ['YouTube.COM/Shorts'] } },
+      platforms: { youtube: { enabled: true, feedViewIds: ['reel_watch_fragment_root'], urlShapes: ['YouTube.COM/Shorts'] } },
     });
     expect(good.ok).toBe(true);
     if (good.ok) {
-      expect(good.rules.platforms.chrome?.urlShapes).toEqual(['youtube.com/shorts']);
+      expect(good.rules.platforms.youtube?.urlShapes).toEqual(['youtube.com/shorts']);
     }
 
     const bad = validateDetectionRules({
       schemaVersion: 1,
       minAppVersion: '1.0.0',
-      platforms: { chrome: { enabled: true, urlShapes: ['youtube.com/shorts?q=*'] } },
+      platforms: { youtube: { enabled: true, feedViewIds: ['reel_watch_fragment_root'], urlShapes: ['youtube.com/shorts?q=*'] } },
     });
     expect(bad.ok).toBe(false);
+  });
+
+  it('urlShapes alone is NOT a signature any more (r20, mirrors the app)', () => {
+    const result = validateDetectionRules({
+      schemaVersion: 1,
+      minAppVersion: '1.0.0',
+      platforms: { youtube: { enabled: true, urlShapes: ['youtube.com/shorts'] } },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join(' ')).toContain('no signatures');
+    }
+  });
+
+  it('rejects the removed chrome/chrome_beta platforms (r20)', () => {
+    const result = validateDetectionRules({
+      schemaVersion: 1,
+      minAppVersion: '1.0.0',
+      platforms: { chrome: { enabled: true, urlShapes: ['youtube.com/shorts'] } },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join(' ')).toContain('Unknown platform: chrome');
+    }
   });
 
   it('drops duplicate entries and records them as clamped', () => {
@@ -191,8 +218,6 @@ describe('validateDetectionRules (dynamic remote rule config)', () => {
     }
     const viewIds = shapes.map((s) => s.replace(/[^A-Za-z0-9_]/g, '_'));
     const platforms: Record<string, unknown> = {
-      chrome: { enabled: true, urlShapes: shapes },
-      chrome_beta: { enabled: true, urlShapes: shapes },
       facebook: {
         enabled: true,
         eventTextHints: shapes.map((s) => s.toUpperCase()),
@@ -200,6 +225,7 @@ describe('validateDetectionRules (dynamic remote rule config)', () => {
         navHints: shapes.map((s) => s.toUpperCase()),
         reelsHints: shapes.map((s) => s.toUpperCase()),
         fullscreenHints: shapes.map((s) => s.toUpperCase()),
+        activityHints: shapes,
       },
       youtube: {
         enabled: true,

@@ -30,15 +30,16 @@ import { isRecord } from '../middleware/validation';
 
 /** Canonical platform keys — each maps to one DETECTION STRATEGY SHAPE.
  *  `tiktok` covers both TikTok package names (package gate), `instagram`
- *  covers both Instagram package names (shared signature set). */
+ *  covers both Instagram package names (shared signature set).
+ *  v2.9.4 r20: `chrome`/`chrome_beta` REMOVED — browser URL detection was
+ *  deleted from the app (false-positive source; URL substring matches
+ *  fired on pages that merely contained a shorts-looking URL). */
 export type PlatformId =
   | 'youtube'
   | 'tiktok'
   | 'facebook'
   | 'facebook_lite'
-  | 'instagram'
-  | 'chrome'
-  | 'chrome_beta';
+  | 'instagram';
 
 export interface PlatformRules {
   enabled: boolean;
@@ -55,7 +56,9 @@ export interface PlatformRules {
   fullscreenHints?: string[];
   /** Half-screen geometry gate (facebook_lite inline-video disambiguation). */
   immersiveGate?: boolean;
-  /** Browser URL shapes, lowercased contains-match (chrome). */
+  /** LEGACY (r20): browser URL shapes — the URL strategy was removed from
+   *  the app; no platform consumes this key any more. Kept accepted so
+   *  old stored docs still validate. */
   urlShapes?: string[];
   /** Secondary package namespaces (instagram lite container id). */
   liteFeedViewIds?: string[];
@@ -82,7 +85,7 @@ export type DetectionRulesValidationResult =
 // ---------------------------------------------------------------------------
 
 export const DETECTION_RULES_LIMITS = {
-  maxPlatforms: 7,
+  maxPlatforms: 5,
   /** Per signature list. */
   maxListEntries: 25,
   /** Single signature entry. */
@@ -98,8 +101,6 @@ export const DETECTION_PLATFORMS: readonly PlatformId[] = [
   'facebook',
   'facebook_lite',
   'instagram',
-  'chrome',
-  'chrome_beta',
 ];
 
 /** View ids: android resource-name fragment — short (`reel_recycler`),
@@ -116,6 +117,8 @@ const SEMVER_RE = /^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$/;
 // ---------------------------------------------------------------------------
 
 const SHORTS_URL_SHAPES: readonly string[] = [
+  // LEGACY (r20): the URL strategy is gone from the app; shapes kept only
+  // so validateDetectionRules still accepts urlShapes as a legacy key.
   'youtube.com/shorts',
   'm.youtube.com/shorts',
   'facebook.com/reel/',
@@ -123,6 +126,7 @@ const SHORTS_URL_SHAPES: readonly string[] = [
   'instagram.com/reel/',
   'instagram.com/reels/',
 ];
+void SHORTS_URL_SHAPES;
 
 export const DEFAULT_DETECTION_RULES: DetectionRulesDoc = {
   schemaVersion: 1,
@@ -161,8 +165,6 @@ export const DEFAULT_DETECTION_RULES: DetectionRulesDoc = {
       sharedFeedViewIds: ['reel_recycler'],
       activityHints: ['clipsactivity'],
     },
-    chrome: { enabled: true, urlShapes: [...SHORTS_URL_SHAPES] },
-    chrome_beta: { enabled: true, urlShapes: [...SHORTS_URL_SHAPES] },
   },
 };
 
@@ -312,6 +314,8 @@ export function validateDetectionRules(input: unknown): DetectionRulesValidation
     const rules: PlatformRules = { enabled };
     // Package-gate platforms (the whole app is the feed) need no lists;
     // every other platform must carry at least one signature list.
+    // v2.9.4 r20: urlShapes is a legacy key — it does NOT count as a
+    // signature (the URL strategy was removed from the app).
     let anySignature = platformKey === 'tiktok';
 
     for (const spec of [...VIEW_ID_LISTS, ...TEXT_LISTS, ...URL_LISTS]) {
@@ -321,7 +325,7 @@ export function validateDetectionRules(input: unknown): DetectionRulesValidation
       if (list === undefined) continue;
       if (list.length > 0) {
         (rules as unknown as Record<string, unknown>)[key] = list;
-        anySignature = true;
+        if (spec.key !== 'urlShapes') anySignature = true;
       }
     }
 
@@ -336,7 +340,7 @@ export function validateDetectionRules(input: unknown): DetectionRulesValidation
 
     if (!anySignature) {
       errors.push(
-        `platforms.${platformKey} has no signatures (enable one of viewIds/textHints/urlShapes, or use a package-gate platform)`
+        `platforms.${platformKey} has no signatures (enable one of viewIds/textHints, or use a package-gate platform)`
       );
       continue;
     }

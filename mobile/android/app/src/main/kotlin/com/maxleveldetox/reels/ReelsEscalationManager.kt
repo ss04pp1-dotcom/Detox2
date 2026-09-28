@@ -1,18 +1,8 @@
 package com.maxleveldetox.reels
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.media.AudioManager
-import android.media.RingtoneManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import androidx.core.app.NotificationCompat
-import com.maxleveldetox.MainActivity
-import com.maxleveldetox.R
 import com.maxleveldetox.enforcement.SystemClockNow
 import com.maxleveldetox.enforcement.ViolationManager
 import com.maxleveldetox.storage.StateRepository
@@ -25,30 +15,32 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 /**
- * ReelsEscalationManager (v2.0 Phase B2) — the de-escalation friction
- * ladder, ported from the reference app (report-modes.md §3) with our
- * honesty constraints:
+ * ReelsEscalationManager (v2.0 Phase B2 → v2.9.4 r20) — the burst
+ * counter behind the shorts interception ladder:
  *
- *   attempt 1 (within 60s)  -> warning TOAST
- *   attempt 2                -> SOFT overlay with 1-min / 2-min unlock
- *                                buttons (spends the daily reels allowance)
- *   attempt >= 3             -> HARD overlay: 10-second countdown, then
- *                                ringtone + force-stop of the offending app
+ *   attempt 1..4 (each < 50 s apart)  -> warning TOAST
+ *   attempt 5 (rapid stretch)         -> 1-minute CAGE (EnforcementWall,
+ *                                       in-memory, never persisted)
  *
  * QUOTA MODEL (time-based, not coins — coins are for session temp-unlock):
- *   - daily reels allowance (default 30 min, clamped 5..120): soft unlocks
- *     draw minutes from it
- *   - 3 emergency passes per day: independent 1-min unlocks for when the
- *     allowance is exhausted
+ *   - daily reels allowance (default 30 min, clamped 5..120): the
+ *     settings screen's unlock buttons draw minutes from it
+ *   - 3 emergency passes per day: independent 1-min unlocks for when
+ *     the allowance is exhausted
  *   - per-package unblock window is reels-scoped: it does NOT weaken any
  *     Study/Detox session policy (the PolicyEngine never consults it)
+ *
+ * v2.9.4 r20: the old 10-second overlay lockout flow
+ * (ReelsOverlayActivity + onHardLockoutFinished + ringtone/notification/
+ * force-stop) was REMOVED — the activity was unreachable dead code since
+ * r18 (nothing ever started it) and its removal is part of the
+ * junk-clean-up. The escalation surface is the toast + burst cage.
  *
  * ANTI-BYPASS:
  *   - counters + quota persisted in DataStore; daily reset keyed by local
  *     date, not by app restarts
- *   - the 60s consecutive-reset prevents toasting forever without ever
- *     escalating; the hard lockout clears the counter only AFTER the full
- *     10s countdown completes (inside ReelsOverlayActivity)
+ *   - the 50 s consecutive-reset prevents toasting forever without ever
+ *     escalating (attempts spaced ~1 min apart NEVER accumulate)
  *   - unblock windows use elapsedRealtime — changing the system clock
  *     cannot extend them
  */
@@ -238,92 +230,6 @@ class ReelsEscalationManager(
     }
 
     // -----------------------------------------------------------------
-    // Hard lockout completion (called by ReelsOverlayActivity countdown)
-    // -----------------------------------------------------------------
-
-    /**
-     * The 10s countdown completed in the foreground: clear the consecutive
-     * counter, play the (shaming) ringtone, post the completion
-     * notification and force-stop the offending app.
-     */
-    fun onHardLockoutFinished(pkg: String) {
-        scope.launch {
-            mutex.withLock {
-                val state = rolloverDateIfNeeded(stateRepo.blockingReels())
-                stateRepo.saveReels(state.copy(consecutiveCount = 0))
-            }
-            violationManager.record(
-                sessionId = "reels",
-                pkg = pkg,
-                type = com.maxleveldetox.enforcement.ViolationType.SHORTS_ENTRY,
-                severity = "HIGH",
-                warningNumber = 0,
-                action = "reels_hard_lockout_served",
-            )
-            playLockoutFinishedRingtone()
-            postLockoutFinishedNotification()
-            // v2.7 r13 (user-requested): even the hard lockout stays inside
-            // the offending app — navigate to its safe surface (YouTube
-            // Home / FB Feed / IG Feed) instead of killing it. Force-stop
-            // remains the fallback for platforms with no safe surface
-            // (TikTok / browser shorts tabs).
-            if (!com.maxleveldetox.reels.ReelsRedirect.navigateFromContext(context, pkg)) {
-                forceStopPackage(pkg)
-            }
-        }
-    }
-
-    private fun playLockoutFinishedRingtone() {
-        try {
-            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            if (am.ringerMode != AudioManager.RINGER_MODE_NORMAL) return // silent/vibrate — respect it
-            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE) ?: return
-            RingtoneManager.getRingtone(context, uri)?.play()
-        } catch (_: Exception) {
-            // ringtone is a shaming nicety, never a security dependency
-        }
-    }
-
-    private fun postLockoutFinishedNotification() {
-        try {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                nm.createNotificationChannel(
-                    NotificationChannel(
-                        CHANNEL_REELS, context.getString(R.string.channel_reels),
-                        NotificationManager.IMPORTANCE_DEFAULT,
-                    ).apply {
-                        description = context.getString(R.string.channel_reels_desc)
-                    }
-                )
-            }
-            val open = PendingIntent.getActivity(
-                context, 0, Intent(context, MainActivity::class.java),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-            val notif = NotificationCompat.Builder(context, CHANNEL_REELS)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
-                .setContentTitle(context.getString(R.string.notif_reels_lockout_done_title))
-                .setContentText(context.getString(R.string.notif_reels_lockout_done_body))
-                .setContentIntent(open)
-                .setAutoCancel(true)
-                .build()
-            nm.notify(NOTIF_ID_LOCKOUT_DONE, notif)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun forceStopPackage(pkg: String) {
-        // HOME first (via the service that detected us), then kill the
-        // background process so relaunching takes real intent.
-        try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            am.killBackgroundProcesses(pkg)
-        } catch (_: Exception) {
-        }
-    }
-
-    // -----------------------------------------------------------------
     // Daily rollover + status projection
     // -----------------------------------------------------------------
 
@@ -384,7 +290,5 @@ class ReelsEscalationManager(
         const val HARD_THRESHOLD = 5                  // 5 rapid attempts -> 1-minute cage lockout
         const val EMERGENCY_PASSES_PER_DAY = 3
         const val DEFAULT_ALLOWANCE_MINUTES = 30
-        const val CHANNEL_REELS = "mld_reels"
-        const val NOTIF_ID_LOCKOUT_DONE = 4101
     }
 }

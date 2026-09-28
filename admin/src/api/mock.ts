@@ -301,7 +301,7 @@ function currentConfig(): ConfigResponse {
 
 // ---- detection rules (v2.5.8) mock state ----
 
-const DETECTION_PLATFORM_KEYS: readonly string[] = ['youtube', 'tiktok', 'facebook', 'facebook_lite', 'instagram', 'chrome', 'chrome_beta'];
+const DETECTION_PLATFORM_KEYS: readonly string[] = ['youtube', 'tiktok', 'facebook', 'facebook_lite', 'instagram'];
 
 const DETECTION_DEFAULTS_MOCK: DetectionRulesDoc = {
   schemaVersion: 1,
@@ -320,8 +320,6 @@ const DETECTION_DEFAULTS_MOCK: DetectionRulesDoc = {
     },
     facebook_lite: { enabled: true, feedViewIds: ['video_view'], immersiveGate: true, activityHints: ['reelsactivity', 'reelactivity'] },
     instagram: { enabled: true, feedViewIds: ['root_clips_layout'], liteFeedViewIds: ['clips_viewer_video_container'], sharedFeedViewIds: ['reel_recycler'], activityHints: ['clipsactivity'] },
-    chrome: { enabled: true, urlShapes: ['youtube.com/shorts', 'facebook.com/reel/', 'instagram.com/reel/'] },
-    chrome_beta: { enabled: true, urlShapes: ['youtube.com/shorts', 'facebook.com/reel/', 'instagram.com/reel/'] },
   },
 };
 

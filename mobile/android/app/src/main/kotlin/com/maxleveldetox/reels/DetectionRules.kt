@@ -7,9 +7,15 @@ import org.json.JSONObject
  * DetectionRules (v2.5.8 roadmap — Reels/Shorts detection robustness).
  *
  * Dynamic remote rule config for the signature-based shorts detector: the
- * admin panel publishes fresh View IDs / content-description hints / URL
- * shapes whenever YouTube, Instagram, TikTok or Facebook ship a UI update,
- * and the app picks them up on the next sync — NO app release needed.
+ * admin panel publishes fresh View IDs / content-description hints /
+ * activity-name hints whenever YouTube, Instagram, TikTok or Facebook ship
+ * a UI update, and the app picks them up on the next sync — NO app release
+ * needed.
+ *
+ * v2.9.4 r20: the Chrome browser URL strategy (Shape.URL + the chrome /
+ * chrome_beta platform entries) was REMOVED — URL substring matching was a
+ * false-positive source (pages merely CONTAINING a shorts-looking URL got
+ * blocked) and browsers were never part of the requested platform set.
  *
  * SECURITY BOUNDARY (mirrors RuntimeConfig, TRD §34–35, §51):
  *  1. COMPILED_DEFAULTS are frozen in the binary and always safe — they are
@@ -51,8 +57,12 @@ object DetectionRules {
         val activityHints: List<String> = emptyList(),
     )
 
-    /** Detection strategy shape — compiled in (rules swap signatures only). */
-    enum class Shape { VIEW_ID, PACKAGE_GATE, TEXT_BFS, URL }
+    /** Detection strategy shape — compiled in (rules swap signatures only).
+     *  v2.9.4 r20: Shape.URL removed together with the Chrome browser
+     *  strategy — URL substring matching was a false-positive source
+     *  (blocked pages that merely CONTAINED a shorts-looking URL) and
+     *  was never part of the requested platform set. */
+    enum class Shape { VIEW_ID, PACKAGE_GATE, TEXT_BFS }
 
     /**
      * A resolved, effective rule: the shape tells ReelsDetector which
@@ -79,7 +89,7 @@ object DetectionRules {
     private const val MIN_ENTRY_LENGTH = 3
     private const val MAX_ENTRY_LENGTH = 64
     private const val MAX_DOC_CHARS = 20_000
-    private const val MAX_PLATFORMS = 7
+    private const val MAX_PLATFORMS = 5
 
     private val VIEW_ID_RE = Regex("^[A-Za-z][A-Za-z0-9_./:]{2,63}$")
     private val TEXT_HINT_RE = Regex("^[\\x20-\\x7E]+$")
@@ -99,23 +109,17 @@ object DetectionRules {
         // One shared signature set for BOTH Instagram packages (pre-v2.5.8
         // behavior: detectInstagram ran for the lite package too).
         "instagram" to (Shape.VIEW_ID to listOf(PKG_INSTAGRAM, PKG_INSTAGRAM_LITE)),
-        "chrome" to (Shape.URL to listOf(PKG_CHROME)),
-        "chrome_beta" to (Shape.URL to listOf(PKG_CHROME_BETA)),
-    )
-
-    private val DEFAULT_URL_SHAPES = listOf(
-        "youtube.com/shorts",
-        "m.youtube.com/shorts",
-        "facebook.com/reel/",
-        "facebook.com/reels/",
-        "instagram.com/reel/",
-        "instagram.com/reels/",
     )
 
     /**
      * The frozen compiled defaults — byte-equivalent to ReelsDetector's
      * pre-v2.5.8 shipped signatures (verified against the worker's
      * DEFAULT_DETECTION_RULES contract test).
+     *
+     * v2.9.4 r20: chrome/chrome_beta entries REMOVED (see Shape.URL note)
+     * — a remote doc that still contains them is rejected whole by
+     * parseAndValidate (unknown platform), so the app safely keeps these
+     * compiled defaults until the admin republishes without them.
      */
     val COMPILED_DEFAULTS: Map<String, PlatformRule> = mapOf(
         "youtube" to PlatformRule(
@@ -196,8 +200,6 @@ object DetectionRules {
                 "reelsvieweractivity",
             ),
         ),
-        "chrome" to PlatformRule(enabled = true, urlShapes = DEFAULT_URL_SHAPES),
-        "chrome_beta" to PlatformRule(enabled = true, urlShapes = DEFAULT_URL_SHAPES),
     )
 
     // -----------------------------------------------------------------
@@ -304,7 +306,7 @@ object DetectionRules {
                     navHints = list("navHints", TEXT_HINT_RE),
                     reelsHints = list("reelsHints", TEXT_HINT_RE),
                     fullscreenHints = list("fullscreenHints", TEXT_HINT_RE),
-                    urlShapes = list("urlShapes", URL_SHAPE_RE),
+                    urlShapes = list("urlShapes", URL_SHAPE_RE), // legacy key — kept accepted so old docs parse; no strategy consumes it
                     liteFeedViewIds = list("liteFeedViewIds", VIEW_ID_RE),
                     sharedFeedViewIds = list("sharedFeedViewIds", VIEW_ID_RE),
                     activityHints = list("activityHints", TEXT_HINT_RE),
@@ -312,12 +314,13 @@ object DetectionRules {
                 )
 
                 // Package-gate shapes need no signatures; everything else
-                // must carry at least one.
+                // must carry at least one (urlShapes no longer counts — the
+                // URL strategy is gone, r20).
                 val hasSignatures = rule.feedViewIds.isNotEmpty() ||
                     rule.immersiveViewIds.isNotEmpty() ||
                     rule.eventTextHints.isNotEmpty() || rule.reelDetailsHints.isNotEmpty() ||
                     rule.navHints.isNotEmpty() || rule.reelsHints.isNotEmpty() ||
-                    rule.fullscreenHints.isNotEmpty() || rule.urlShapes.isNotEmpty() ||
+                    rule.fullscreenHints.isNotEmpty() ||
                     rule.liteFeedViewIds.isNotEmpty() || rule.sharedFeedViewIds.isNotEmpty() ||
                     rule.activityHints.isNotEmpty()
                 if (shape != Shape.PACKAGE_GATE && !hasSignatures) return null
@@ -360,6 +363,4 @@ object DetectionRules {
     const val PKG_FACEBOOK_LITE = "com.facebook.lite"
     const val PKG_INSTAGRAM = "com.instagram.android"
     const val PKG_INSTAGRAM_LITE = "com.instagram.lite"
-    const val PKG_CHROME = "com.android.chrome"
-    const val PKG_CHROME_BETA = "com.chrome.beta"
 }

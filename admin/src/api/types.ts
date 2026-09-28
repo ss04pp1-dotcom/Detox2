@@ -263,9 +263,7 @@ export type DetectionPlatformId =
   | 'tiktok'
   | 'facebook'
   | 'facebook_lite'
-  | 'instagram'
-  | 'chrome'
-  | 'chrome_beta';
+  | 'instagram';
 
 export interface PlatformRules {
   enabled: boolean;
@@ -371,12 +369,6 @@ export const DETECTION_LIST_FIELDS: Array<{
     label: 'Activity-name hints',
     hint: 'Lowercased contains-match on the window-state activity class (e.g. shortsactivity) — most drift-resistant.',
     platforms: ['youtube', 'facebook', 'facebook_lite', 'instagram'],
-  },
-  {
-    key: 'urlShapes',
-    label: 'URL shapes',
-    hint: 'Lowercase URL fragments matched against the url_bar text.',
-    platforms: ['chrome', 'chrome_beta'],
   },
 ];
 
