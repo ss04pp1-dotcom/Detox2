@@ -35,14 +35,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final app = AppStateScope.of(context);
 
-    // While enforcement is active, the shell is REPLACED by the session
-    // experience (UI/UX §9) — normal navigation must not be an escape hatch.
-    if (app.state.sessionActive || app.state.cageActive) {
-      return const ActiveSessionShell();
-    }
-
+    // Bottom navigation bar always remains accessible.
+    // While enforcement is active, the Home tab displays the ActiveSessionShell.
     final pages = [
-      const _HomePage(),
+      (app.state.sessionActive || app.state.cageActive)
+          ? const ActiveSessionShell()
+          : const _HomePage(),
       const _InsightsTabPage(),
       const _CommunityTabPage(),
       const _TasksTabPage(),
