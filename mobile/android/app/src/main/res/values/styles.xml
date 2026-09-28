@@ -6,6 +6,19 @@
         <item name="android:windowBackground">#0A0E1A</item>
     </style>
 
+    <!-- Flutter Launch and Normal Themes -->
+    <style name="LaunchTheme" parent="Theme.Mld">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">#0A0E1A</item>
+        <item name="android:windowBackground">#0A0E1A</item>
+    </style>
+
+    <style name="NormalTheme" parent="Theme.Mld">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">#0A0E1A</item>
+        <item name="android:windowBackground">#0A0E1A</item>
+    </style>
+
     <!-- Lock/alarm screens: immersive, over the lock screen. -->
     <style name="Theme.Mld.Lock" parent="Theme.Material3.Dark.NoActionBar">
         <item name="android:windowBackground">#0A0E1A</item>
