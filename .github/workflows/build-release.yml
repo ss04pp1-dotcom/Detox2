@@ -32,6 +32,8 @@ jobs:
   build:
     name: Build APK and AAB
     runs-on: ubuntu-latest
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError"
     defaults:
       run:
         working-directory: mobile
@@ -116,12 +118,14 @@ jobs:
         run: |
           flutter build apk --release \
             --target-platform android-arm64 \
+            --no-tree-shake-icons \
             ${{ steps.flags.outputs.gradle_flags }} \
             ${{ steps.flags.outputs.build_flags }}
 
       - name: Build Release App Bundle (AAB for Play Store)
         run: |
           flutter build appbundle --release \
+            --no-tree-shake-icons \
             ${{ steps.flags.outputs.gradle_flags }} \
             ${{ steps.flags.outputs.build_flags }}
 

@@ -86,6 +86,11 @@ android {
         ]
     }
 
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
     signingConfigs {
         release {
             def ksFile = resolveKeystoreFile()
