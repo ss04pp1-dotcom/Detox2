@@ -212,68 +212,110 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               ],
               const SizedBox(height: AppSpacing.xxl),
 
-              // Primary control row (v2.6 reference design: Pause / End / Details).
-              Row(
-                children: [
-                  if (!isDetox &&
-                      s.status == SessionStatus.active &&
-                      !unlockActive &&
-                      s.pauseCount < s.maxPauses) ...[
+              if (isDetox) ...[
+                // Detox keeps its original controls: End / Details + temp unlock
+                // (Pause was never a Detox control; Study has no controls at all).
+                Row(
+                  children: [
                     Expanded(
                       child: MLDButton(
-                        label: 'Pause',
-                        icon: Icons.pause_rounded,
+                        label: 'End',
+                        icon: Icons.stop_rounded,
+                        variant: MLDButtonVariant.danger,
                         expanded: false,
                         height: 48,
-                        onPressed: _pickBreak,
+                        onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeBailout),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: MLDButton(
+                        label: 'Details',
+                        icon: Icons.info_outline,
+                        variant: MLDButtonVariant.secondary,
+                        expanded: false,
+                        height: 48,
+                        onPressed: () => _showDetails(s),
+                      ),
+                    ),
                   ],
-                  Expanded(
-                    child: MLDButton(
-                      label: 'End',
-                      icon: Icons.stop_rounded,
-                      variant: MLDButtonVariant.danger,
-                      expanded: false,
-                      height: 48,
-                      onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeBailout),
-                    ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                // While a Prime commit owns the session the temporary-unlock
+                // path is refused natively anyway; show the one real exit
+                // instead: the TOTP emergency give-up.
+                if (_primeActive)
+                  MLDButton(
+                    label: 'END WITH EMERGENCY CODE',
+                    icon: Icons.military_tech_outlined,
+                    variant: MLDButtonVariant.danger,
+                    loading: _primeBusy,
+                    onPressed: _giveUpPrime,
+                  )
+                else
+                  MLDButton(
+                    label: unlockActive
+                        ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)}'
+                        : 'TEMPORARY UNLOCK · 5 coins = 5 min',
+                    icon: Icons.lock_open,
+                    onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeTempUnlock),
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: MLDButton(
-                      label: 'Details',
-                      icon: Icons.info_outline,
-                      variant: MLDButtonVariant.secondary,
-                      expanded: false,
-                      height: 48,
-                      onPressed: () => _showDetails(s),
+              ] else ...[
+                // Study Mode deliberately has no End/Pause/Unlock control.
+                // The native SessionKiosk wall is the hard lock and this
+                // Flutter surface mirrors that promise: timer + status only.
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.study.withValues(alpha: .14),
+                        AppColors.surface,
+                      ],
                     ),
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    border: Border.all(color: AppColors.study.withValues(alpha: .32)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.study.withValues(alpha: .14),
+                        ),
+                        child: const Icon(Icons.lock_rounded, color: AppColors.study),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('STUDY MODE IS LOCKED', style: AppTypography.label(color: AppColors.study)),
+                            const SizedBox(height: 3),
+                            Text(
+                              'No pause, end or temporary unlock. Stay focused until the timer reaches zero.',
+                              style: AppTypography.caption(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_primeActive) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  MLDButton(
+                    label: 'END WITH EMERGENCY CODE',
+                    icon: Icons.military_tech_outlined,
+                    variant: MLDButtonVariant.danger,
+                    loading: _primeBusy,
+                    onPressed: _giveUpPrime,
                   ),
                 ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // v2.9.3 r19: while a Prime commit owns the session the
-              // temporary-unlock path is refused natively anyway — show
-              // the one real exit instead: the TOTP emergency give-up.
-              if (_primeActive)
-                MLDButton(
-                  label: 'END WITH EMERGENCY CODE',
-                  icon: Icons.military_tech_outlined,
-                  variant: MLDButtonVariant.danger,
-                  loading: _primeBusy,
-                  onPressed: _giveUpPrime,
-                )
-              else
-                MLDButton(
-                  label: unlockActive
-                      ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)}'
-                      : 'TEMPORARY UNLOCK · 5 coins = 5 min',
-                  icon: Icons.lock_open,
-                  onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeTempUnlock),
-                ),
+              ],
               const SizedBox(height: AppSpacing.md),
 
               // Emergency is ALWAYS discoverable (PRD §27, UI/UX §88).
@@ -344,6 +386,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     );
   }
 
+  // ignore: unused_element
   Future<void> _pickBreak() async {
     final minutes = await showDialog<int>(
       context: context,

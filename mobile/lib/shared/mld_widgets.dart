@@ -112,31 +112,72 @@ class MLDAppBarTitle extends StatelessWidget {
 }
 
 class MLDBrandHeader extends StatelessWidget {
-  const MLDBrandHeader({super.key, this.compact = false});
+  const MLDBrandHeader({super.key, this.compact = false, this.statusLabel});
 
   final bool compact;
+
+  /// Optional status pill text. Null (default) hides the pill so the header
+  /// never shows a status that is not backed by real state.
+  final String? statusLabel;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        CustomPaint(
-          size: Size(compact ? 34 : 42, compact ? 28 : 34),
-          painter: const _MLDLogoPainter(),
-        ),
-        SizedBox(width: compact ? 8 : 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'MAXLEVEL DETOX',
-              style: AppTypography.body(weight: FontWeight.w900)
-                  .copyWith(fontSize: compact ? 13 : 15, letterSpacing: -.2),
+        Container(
+          width: compact ? 42 : 48,
+          height: compact ? 34 : 40,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary.withValues(alpha: .18),
+                AppColors.premium.withValues(alpha: .10),
+              ],
             ),
-            if (!compact)
-              Text('Better You, Higher Level', style: AppTypography.caption().copyWith(fontSize: 10)),
-          ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.primary.withValues(alpha: .28)),
+          ),
+          child: Center(
+            child: CustomPaint(
+              size: Size(compact ? 30 : 34, compact ? 23 : 26),
+              painter: const _MLDLogoPainter(),
+            ),
+          ),
         ),
+        SizedBox(width: compact ? 9 : 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'MAXLEVEL DETOX',
+                style: AppTypography.body(weight: FontWeight.w900)
+                    .copyWith(fontSize: compact ? 13 : 15, letterSpacing: -.2),
+              ),
+              if (!compact)
+                Text('Better You, Higher Level', style: AppTypography.caption().copyWith(fontSize: 10)),
+            ],
+          ),
+        ),
+        if (!compact && statusLabel != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: AppColors.elevated.withValues(alpha: .72),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.edge),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.success)),
+                const SizedBox(width: 6),
+                Text(statusLabel!, style: AppTypography.label(color: AppColors.success).copyWith(fontSize: 9, letterSpacing: .7)),
+              ],
+            ),
+          ),
       ],
     );
   }

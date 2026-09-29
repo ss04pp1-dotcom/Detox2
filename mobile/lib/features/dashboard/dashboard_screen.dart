@@ -35,12 +35,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final app = AppStateScope.of(context);
 
-    // Bottom navigation bar always remains accessible.
-    // While enforcement is active, the Home tab displays the ActiveSessionShell.
+    // During an active enforcement session the session surface owns the
+    // whole app shell. There is intentionally no bottom navigation here:
+    // Insights/Community/Tasks/Settings must not become an in-app escape
+    // route from Study Mode. The native SessionKiosk remains the real hard
+    // enforcement layer outside the app.
+    if (app.state.sessionActive || app.state.cageActive) {
+      return const ActiveSessionShell();
+    }
+
     final pages = [
-      (app.state.sessionActive || app.state.cageActive)
-          ? const ActiveSessionShell()
-          : const _HomePage(),
+      const _HomePage(),
       const _InsightsTabPage(),
       const _CommunityTabPage(),
       const _TasksTabPage(),
@@ -50,7 +55,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       body: DecoratedBox(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.background, Color(0xFF0B1020)]),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.background, Color(0xFF07182C)],
+          ),
         ),
         child: IndexedStack(index: _tab, children: pages),
       ),
