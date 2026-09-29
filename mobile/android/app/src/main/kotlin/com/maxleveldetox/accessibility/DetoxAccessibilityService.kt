@@ -844,23 +844,62 @@ class DetoxAccessibilityService : AccessibilityService() {
         return false
     }
 
+    // -----------------------------------------------------------------
+    // v2.9.6 r22 — KEY FILTER LATENCY FIX (the volume bug).
+    //
+    // User report: with the app installed, ONE volume press moved the
+    // volume several steps. Root cause: this filter runs for EVERY
+    // hardware key event on the device (flagRequestFilterKeyEvents), and
+    // the old body called isAnyModeActive() unconditionally — which does
+    // a runBlocking DataStore read on the service main thread. That
+    // stalled the system input pipeline (a11y filtering is synchronous
+    // in the dispatch path), and OEM input pipelines replay/stack
+    // delayed key events — so one press landed as several.
+    //
+    // Fix, two layers:
+    //   1. FAST PATH — we only ever CONSUME the five navigation keys.
+    //      Everything else (volume keys first of all) returns false with
+    //      ZERO work, adding no latency to the device input pipeline.
+    //   2. TTL CACHE — for the nav keys, the enforcement check (and its
+    //      DataStore read) runs at most once per 250 ms instead of per
+    //      event; after a session ends the keys unblock within a
+    //      quarter second worst case.
+    // -----------------------------------------------------------------
+
+    /** Cached isAnyModeActive() verdict — see the comment above. */
+    @Volatile private var anyModeCache = false
+    @Volatile private var anyModeCacheAt = 0L
+
+    private fun isAnyModeActiveCached(): Boolean {
+        val now = SystemClockNow.elapsed
+        if (now - anyModeCacheAt < MODE_CACHE_TTL_MS) return anyModeCache
+        val live = isAnyModeActive()
+        anyModeCache = live
+        anyModeCacheAt = now
+        return live
+    }
+
     override fun onKeyEvent(event: KeyEvent?): Boolean {
         event ?: return false
-        // Emergency dialer must always stay interactive
-        if (EmergencyLockdown.isActive(this)) return false
-
-        // While ANY mode is active (Study, Detox, Monk, Lock My Phone, Cage, etc.),
-        // Home, Back, Recents hardware and navigation keys are completely blocked
-        // (like the Cage), without changing the original UI of the mode.
-        if (!isAnyModeActive()) return false
-
+        // FAST PATH FIRST: keys we never consume pass straight through —
+        // volume keys, camera, power, headset, everything. No state
+        // reads, no work, no added latency.
         return when (event.keyCode) {
             KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_APP_SWITCH,
             KeyEvent.KEYCODE_HOME,
             KeyEvent.KEYCODE_MENU,
             KeyEvent.KEYCODE_ALL_APPS,
-            -> true
+            -> {
+                // Emergency dialer must always stay interactive
+                if (EmergencyLockdown.isActive(this)) return false
+
+                // While ANY mode is active (Study, Detox, Monk, Lock My
+                // Phone, Cage, etc.), Home, Back, Recents hardware and
+                // navigation keys are completely blocked (like the Cage),
+                // without changing the original UI of the mode.
+                isAnyModeActiveCached()
+            }
             else -> false
         }
     }
@@ -930,6 +969,12 @@ class DetoxAccessibilityService : AccessibilityService() {
 
         /** v2.9.2 r18 — kiosk assert heartbeat cadence. */
         private const val KIOSK_ASSERT_INTERVAL_MS = 2_000L
+
+        /** v2.9.6 r22 — key-filter enforcement cache TTL. The raw check
+         *  includes a blocking DataStore read; per-key-event execution
+         *  stalled the input pipeline (volume keys stepped several bars
+         *  per press). At most one real check per 250 ms. */
+        private const val MODE_CACHE_TTL_MS = 250L
 
         /** v2.9 r16 (extended in r18): delayed re-scan schedule after
          *  entering a monitored app — covers late-inflating shorts UI and

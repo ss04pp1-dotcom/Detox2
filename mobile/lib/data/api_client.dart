@@ -67,7 +67,13 @@ class ApiClient {
   // Auth (Email/Password & Google Sign-In -> Worker session)
   // ---------------------------------------------------------------------
 
-  Future<bool> registerWithEmail(String email, String password, {String? displayName}) async {
+  Future<bool> registerWithEmail(
+    String email,
+    String password, {
+    String? displayName,
+    int? age,
+    String? grade,
+  }) async {
     clearLastError();
     final body = <String, dynamic>{
       'email': email.trim().toLowerCase(),
@@ -76,9 +82,30 @@ class ApiClient {
     if (displayName != null && displayName.trim().isNotEmpty) {
       body['displayName'] = displayName.trim();
     }
+    // v2.9.6 r22 (007): user-requested signup data — age + class/grade.
+    if (age != null) body['age'] = age;
+    if (grade != null && grade.trim().isNotEmpty) body['grade'] = grade.trim();
     final res = await _post('/auth/register', body, authenticated: false);
     if (res == null) return false;
     return _handleAuthResponse(res);
+  }
+
+  /// v2.9.6 r22: signup profile (name / age / class), mirrored locally so
+  /// the info the user entered survives even while offline — the server
+  /// copy is the authority when reachable, this is the offline fallback.
+  Future<void> saveSignupProfile({String? displayName, int? age, String? grade}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (displayName != null && displayName.trim().isNotEmpty) {
+        await prefs.setString('mld_profile_name', displayName.trim());
+      }
+      if (age != null) await prefs.setInt('mld_profile_age', age);
+      if (grade != null && grade.trim().isNotEmpty) {
+        await prefs.setString('mld_profile_class', grade.trim());
+      }
+    } catch (_) {
+      // local mirror is best-effort — the server copy is what matters
+    }
   }
 
   Future<bool> loginWithEmail(String email, String password) async {

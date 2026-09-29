@@ -72,6 +72,10 @@ export function toApiUser(row: UserRow): User {
     id: row.id,
     email: row.email,
     displayName: row.display_name,
+    // v2.9.6 r22 (007): signup profile fields. `undefined` (column not yet
+    // migrated on an old DB) and null both surface as null in the API.
+    age: row.age ?? null,
+    grade: row.grade ?? null,
     status: asEnum(row.status, USER_STATUSES, 'ACTIVE'),
     createdAt: row.created_at,
     updatedAt: row.updated_at,

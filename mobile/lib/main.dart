@@ -21,7 +21,7 @@ import 'shared/mld_widgets.dart';
 ///   Flutter UI  ->  MethodChannel  ->  Kotlin enforcement engine
 ///                                          -> Android system APIs
 /// Flutter renders. Kotlin enforces. The cloud manages the product only.
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.light),
@@ -31,6 +31,15 @@ void main() {
   // the first RewardedAd.load (the stuck-`_loading` trigger). Startup is
   // still never blocked on ads.
   unawaited(_initAds());
+  // v2.9.6 r22 (user bug: "app theke ber hole abar login korte hoy"):
+  // restore the saved login BEFORE the first frame. Previously
+  // restoreSession() raced the splash router inside _bootstrapCloud —
+  // when the secure-storage read finished after the native state push
+  // (very common on cold start), splash saw isAuthenticated == false and
+  // bounced a logged-in user back to the auth screen on every restart.
+  // restoreSession is fully try/catch-guarded and never throws; the
+  // keystore read costs a few hundred ms at most, once per start.
+  await ApiClient.instance.restoreSession();
   runApp(const MldApp());
 }
 
@@ -102,7 +111,9 @@ class _MldAppState extends State<MldApp> {
   /// producers. Wire it end-to-end here (every step individually
   /// failure-tolerant — the app is fully functional offline).
   Future<void> _bootstrapCloud() async {
-    await ApiClient.instance.restoreSession();
+    // v2.9.6 r22: the session restore moved to main() — it now completes
+    // BEFORE the first frame, so the splash router can never race it (the
+    // repeated-login bug). No second restore here.
     await ApiClient.instance.ensureDeviceRegistered();
 
     // Remote config -> Kotlin RuntimeConfig (bounded + clamped natively).
@@ -490,11 +501,15 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
     final s = state.state;
+    // v2.9.6 r22 (user-requested first-run order): Splash -> Onboarding
+    // -> Sign in/up -> app. Onboarding now comes FIRST for a new install;
+    // the account (Gmail, name, age, class) is created after the intro,
+    // and an already-logged-in returning user goes straight through.
     String target = AppConstants.routeShell;
-    if (!ApiClient.instance.isAuthenticated) {
-      target = AppConstants.routeAuth;
-    } else if (!s.onboardingComplete) {
+    if (!s.onboardingComplete) {
       target = AppConstants.routeOnboarding;
+    } else if (!ApiClient.instance.isAuthenticated) {
+      target = AppConstants.routeAuth;
     } else if (!s.pactAccepted) {
       target = AppConstants.routePact;
     } else if (s.sessionActive || s.cageActive) {

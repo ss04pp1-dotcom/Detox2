@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS users (
   status              TEXT NOT NULL DEFAULT 'ACTIVE'
                       CHECK (status IN ('ACTIVE', 'SUSPENDED', 'BANNED', 'DELETED')),
   google_sub          TEXT,
+  -- v2.9.6 r22 (007): signup profile — age in years, class / grade.
+  age                 INTEGER,
+  grade               TEXT,
   created_at          TEXT NOT NULL,
   updated_at          TEXT NOT NULL,
   last_seen_at        TEXT,

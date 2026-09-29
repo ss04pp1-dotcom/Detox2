@@ -23,11 +23,21 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
 
+  // v2.9.6 r22: user-requested signup data — Gmail (email), name, AGE and
+  // CLASS. Age is a numeric field; class is a picker (Class 6-12 /
+  // University / Other — the Bangladesh student ladder).
+  String? _selectedClass;
+  static const _classOptions = [
+    'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
+    'Class 11', 'Class 12', 'University', 'Other',
+  ];
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _ageController = TextEditingController();
 
   static bool _googleInitialized = false;
 
@@ -37,6 +47,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -60,13 +71,27 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       bool ok = false;
+      int? age;
       if (_isSignUp) {
         final name = _nameController.text.trim();
+        final ageText = _ageController.text.trim();
+        age = ageText.isEmpty ? null : int.tryParse(ageText);
         ok = await ApiClient.instance.registerWithEmail(
           email,
           password,
           displayName: name.isNotEmpty ? name : null,
+          age: age,
+          grade: _selectedClass,
         );
+        if (ok) {
+          // v2.9.6 r22: keep the entered profile on-device too (offline
+          // mirror of the server copy).
+          unawaited(ApiClient.instance.saveSignupProfile(
+            displayName: name.isNotEmpty ? name : null,
+            age: age,
+            grade: _selectedClass,
+          ));
+        }
       } else {
         ok = await ApiClient.instance.loginWithEmail(email, password);
       }
@@ -322,10 +347,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Email Field
+                    // Email Field (Gmail or any address)
                     _buildTextField(
                       controller: _emailController,
-                      hint: 'Email address',
+                      hint: 'Email address (Gmail)',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) {
@@ -335,6 +360,34 @@ class _AuthScreenState extends State<AuthScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
+
+                    // Sign Up: Age + Class (v2.9.6 r22 — user-requested
+                    // signup data: Gmail, name, age, class)
+                    if (_isSignUp) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _ageController,
+                              hint: 'Age',
+                              icon: Icons.cake_outlined,
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                final age = int.tryParse(v.trim());
+                                if (age == null) return 'Numbers only';
+                                if (age < 5 || age > 100) return 'Age 5-100';
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildClassPicker()),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
 
                     // Password Field
                     _buildTextField(
@@ -490,6 +543,45 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// v2.9.6 r22: class picker styled to match the text fields — the
+  /// signup form collects Gmail, name, age and class.
+  Widget _buildClassPicker() {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: AppColors.edge.withValues(alpha: 0.5)),
+    );
+    return DropdownButtonFormField<String>(
+      value: _selectedClass,
+      items: [
+        for (final c in _classOptions)
+          DropdownMenuItem(
+            value: c,
+            child: Text(c,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+          ),
+      ],
+      onChanged: (v) => setState(() => _selectedClass = v),
+      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+      dropdownColor: AppColors.surface,
+      icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+      decoration: InputDecoration(
+        hintText: 'Class',
+        hintStyle: const TextStyle(color: AppColors.textDisabled, fontSize: 13),
+        prefixIcon:
+            const Icon(Icons.school_outlined, size: 20, color: AppColors.textSecondary),
+        filled: true,
+        fillColor: AppColors.surface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: border,
+        enabledBorder: border,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme/tokens.dart';
+import '../../data/api_client.dart';
 import '../../data/native_bridge.dart';
 import '../../main.dart';
 import '../../shared/mld_widgets.dart';
@@ -104,8 +105,16 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> {
       );
       return;
     }
+    // v2.9.6 r22 (user-requested first-run order: Onboarding -> Sign in/up
+    // -> app): after the intro chain completes, a user without an account
+    // creates one now (Gmail, name, age, class); an already-signed-in user
+    // goes straight to the app.
+    final String next = ApiClient.instance.isAuthenticated
+        ? AppConstants.routeShell
+        : AppConstants.routeAuth;
+    if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil(
-      AppConstants.routeShell,
+      next,
       (route) => false,
     );
   }

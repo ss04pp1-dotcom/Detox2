@@ -141,6 +141,10 @@ export interface User {
   id: string;
   email: string;
   displayName: string | null;
+  /** v2.9.6 r22 (007): signup profile — age in years (nullable). */
+  age?: number | null;
+  /** v2.9.6 r22 (007): signup profile — class / grade, e.g. "Class 10". */
+  grade?: string | null;
   status: UserStatus;
   createdAt: string;
   updatedAt: string;
@@ -349,6 +353,10 @@ export interface UserRow {
   google_sub?: string | null;
   /** v2.5.7 (004): deterministic referral code (set lazily by GET /referral). */
   referral_code?: string | null;
+  /** v2.9.6 r22 (007): signup profile — absent when the column migration
+   * has not been applied yet (toApiUser treats undefined as null). */
+  age?: number | null;
+  grade?: string | null;
   created_at: string;
   updated_at: string;
   last_seen_at: string | null;

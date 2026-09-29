@@ -271,6 +271,11 @@ export async function authRegister(c: Context): Promise<Response> {
     email: { type: 'string', required: true, minLength: 5, maxLength: 254 },
     password: { type: 'string', required: true, minLength: 6, maxLength: 128 },
     displayName: { type: 'string', required: false, minLength: 1, maxLength: 50 },
+    // v2.9.6 r22 (007): user-requested signup data — Gmail (email), name,
+    // age and class. Both optional so older clients keep working and
+    // Google sign-ups (email + name only) are unaffected.
+    age: { type: 'number', required: false, integer: true, min: 5, max: 100 },
+    grade: { type: 'string', required: false, minLength: 1, maxLength: 30 },
   });
   if (!v.ok) return fail(c, 'VALIDATION_FAILED', v.errors.join('; '), 400);
 
@@ -282,6 +287,8 @@ export async function authRegister(c: Context): Promise<Response> {
   const displayName =
     (v.value.displayName as string | undefined)?.trim() ||
     `User #${randomToken(2).toUpperCase()}`;
+  const age = v.value.age as number | undefined;
+  const grade = (v.value.grade as string | undefined)?.trim() || undefined;
 
   // Check if user already exists
   const existing = await c.env.DB.prepare('SELECT id, status FROM users WHERE email = ?')
@@ -296,24 +303,48 @@ export async function authRegister(c: Context): Promise<Response> {
   const hash = await pbkdf2Hash(password);
   const now = new Date().toISOString();
 
-  try {
+  // v2.9.6 r22 (007): the age/grade columns ship with migration 007; the
+  // same self-healing fallback pattern as password_hash (004) covers a
+  // database where the migration has not been applied yet.
+  const insertUser = async (): Promise<void> => {
     await c.env.DB.prepare(
-      `INSERT INTO users (id, email, password_hash, display_name, status, created_at, updated_at, last_seen_at, deletion_pending_at)
-       VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?, NULL)`
+      `INSERT INTO users (id, email, password_hash, display_name, age, grade, status, created_at, updated_at, last_seen_at, deletion_pending_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, NULL)`
     )
-      .bind(id, email, hash, displayName, now, now, now)
+      .bind(id, email, hash, displayName, age ?? null, grade ?? null, now, now, now)
       .run();
+  };
+  const ensureProfileColumns = async (): Promise<void> => {
+    try {
+      await c.env.DB.prepare('ALTER TABLE users ADD COLUMN age INTEGER').run();
+    } catch (_dupOrMissing) {
+      /* duplicate column (already migrated) is the expected case */
+    }
+    try {
+      await c.env.DB.prepare('ALTER TABLE users ADD COLUMN grade TEXT').run();
+    } catch (_dupOrMissing) {
+      /* duplicate column (already migrated) is the expected case */
+    }
+  };
+
+  try {
+    await insertUser();
   } catch (err) {
     // Gracefully handle dynamic column addition if migration hasn't applied yet
-    if (err instanceof Error && err.message.includes('no such column: password_hash')) {
+    const msg = err instanceof Error ? err.message : '';
+    const missingProfileColumn = msg.includes('no such column: age') || msg.includes('no such column: grade');
+    if (missingProfileColumn) {
+      try {
+        await ensureProfileColumns();
+        await insertUser();
+      } catch (retryErr) {
+        console.error(c.requestId, 'failed to register after alter table', retryErr);
+        return fail(c, 'SERVER_ERROR', 'Registration failed', 500);
+      }
+    } else if (err instanceof Error && err.message.includes('no such column: password_hash')) {
       try {
         await c.env.DB.prepare('ALTER TABLE users ADD COLUMN password_hash TEXT').run();
-        await c.env.DB.prepare(
-          `INSERT INTO users (id, email, password_hash, display_name, status, created_at, updated_at, last_seen_at, deletion_pending_at)
-           VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?, NULL)`
-        )
-          .bind(id, email, hash, displayName, now, now, now)
-          .run();
+        await insertUser();
       } catch (retryErr) {
         console.error(c.requestId, 'failed to register after alter table', retryErr);
         return fail(c, 'SERVER_ERROR', 'Registration failed', 500);
@@ -329,6 +360,8 @@ export async function authRegister(c: Context): Promise<Response> {
     email,
     password_hash: hash,
     display_name: displayName,
+    age: age ?? null,
+    grade: grade ?? null,
     status: 'ACTIVE',
     created_at: now,
     updated_at: now,

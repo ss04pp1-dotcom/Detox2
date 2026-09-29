@@ -645,76 +645,435 @@ class _BreakViewState extends State<_BreakView> {
   }
 }
 
-/// Cage view (UI/UX §27–28): darker, unmistakable, countdown, no buttons
-/// that would hand back access. Ends automatically at zero.
-class _CageView extends StatelessWidget {
+/// Cage view — v2.9.6 r22 (user request, verbatim intent: "কেস মুড =
+/// স্টাডি মুডের যেই স্ক্রিনটা সেই রকম একদম হান্ড্রেড পার্সেন্ট"):
+///
+/// While the cage is active the surface is NO LONGER the old dark
+/// minimal lock screen — it renders the SAME immersive mood screen the
+/// user sees during a running session, and it FOLLOWS the active mood
+/// (Study / Detox styling, icon, title, subject, stats and controls).
+/// Whichever mood the session is in when the cage triggers, that is the
+/// screen the cage shows; with no live session left it defaults to the
+/// Study reference design.
+///
+/// The clock is the CAGE countdown (the intensified restriction), the
+/// status chip says CAGE, and every session control survives — End
+/// (bailout), Details, Temporary Unlock (natively refused with the
+/// CAGE_ACTIVE message — the offer stays visible, exactly like the coin
+/// features the user asked to keep), Emergency Call. Pause is the one
+/// control hidden: a study break during punishment would neutralize the
+/// cage. Ends automatically at zero.
+class _CageView extends StatefulWidget {
   const _CageView();
+
+  @override
+  State<_CageView> createState() => _CageViewState();
+}
+
+class _CageViewState extends State<_CageView> {
+  // v2.9.3 r19 pattern, mirrored here because the cage surface can also be
+  // owned by a Prime commit — the TOTP give-up must stay reachable from
+  // whatever locked surface the user is looking at.
+  bool _primeActive = false;
+  bool _primeBusy = false;
+  AppState? _app;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPrime();
+  }
+
+  Future<void> _checkPrime() async {
+    final status = await NativeBridge.instance.getPrimeCommitStatus();
+    if (!mounted) return;
+    final active = status?['active'] == true;
+    if (active != _primeActive) setState(() => _primeActive = active);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _app ??= AppStateScope.of(context);
+  }
+
+  @override
+  void dispose() {
+    _app?.suppressCompletionRedirect = false;
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final app = AppStateScope.of(context);
     final cage = app.state.cage;
+    final s = app.state.session;
+    // Promoted non-null capture — Dart cannot promote `s` through the
+    // `live != null` bool below, so the narrowed value lives in `live`.
+    final SessionSnapshot? live = (s != null && s.isActive) ? s : null;
 
-    // v2.9.3 r19: the cage view gets the same back-seal as the session
-    // view — it had NO PopScope, so a back press could bubble out of the
-    // root route and exit the app (leaving the cage behind on the
-    // launcher was the only "escape").
+    // Follow the active mood; default to the Study reference design when
+    // the cage outlived its session.
+    final isDetox = live != null && live.mode == SessionMode.detox;
+    final accent = isDetox ? AppColors.detox : AppColors.study;
+    final cageRemaining = cage?.remainingSeconds ?? 0;
+    // Same unlock-state plumbing as the session screen (the Detox cage
+    // mirrors the Detox screen's TEMPORARY UNLOCK button 1:1).
+    final tempUnlock = app.state.tempUnlock;
+    final unlockActive = tempUnlock?.active == true;
+
+    // v2.9.3 r19: the cage view keeps the same back-seal as the session
+    // view — a back press can never bubble out of the root route.
     return PopScope(
       canPop: false,
       child: Scaffold(
-      backgroundColor: AppColors.cageBackground,
+      backgroundColor: isDetox ? const Color(0xFF160D18) : AppColors.background,
       body: SafeArea(
         child: Padding(
-          padding: AppSpacing.screenH,
+          padding: AppSpacing.screenH.copyWith(top: AppSpacing.xl, bottom: AppSpacing.xxl),
           child: Column(
             children: [
-              const SizedBox(height: AppSpacing.massive),
+              // Same banner as the session screen — END stays the first
+              // reachable control in the app.
+              const MLDEmergencyBanner(),
+              const SizedBox(height: AppSpacing.xl),
               Container(
-                padding: const EdgeInsets.all(AppSpacing.xl),
+                width: 72,
+                height: 72,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.danger.withValues(alpha: 0.12),
-                  border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+                  color: accent.withValues(alpha: 0.12),
+                  border: Border.all(color: accent.withValues(alpha: 0.35)),
                 ),
-                child: const Icon(Icons.lock, size: 44, color: AppColors.danger),
+                child: Icon(
+                  isDetox ? Icons.spa_outlined : Icons.menu_book_outlined,
+                  size: 34,
+                  color: accent,
+                ),
               ),
-              const SizedBox(height: AppSpacing.xxl),
-              Text('CAGE', style: AppTypography.display(color: AppColors.danger)),
-              const SizedBox(height: AppSpacing.xxxl),
-              MLDTimer(
-                remainingSeconds: cage?.remainingSeconds ?? 0,
-                color: AppColors.danger,
-                showRing: true,
-                ringProgress: 1 - ((cage?.remainingSeconds ?? 0) / AppConstants.cageDurationSeconds),
-                ringColor: AppColors.danger,
-                ringSize: 200,
-              ),
-              const SizedBox(height: AppSpacing.xxxl),
+              const SizedBox(height: AppSpacing.lg),
               Text(
-                'Repeated violations detected.\nYour restriction has been temporarily intensified.',
-                textAlign: TextAlign.center,
-                style: AppTypography.body(color: AppColors.textSecondary),
+                isDetox ? 'Detox Mode' : 'Study Mode',
+                style: AppTypography.heading(),
+              ),
+              if (!isDetox && live != null && live.subjectName.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(live.subjectName,
+                    style: AppTypography.caption(color: AppColors.textSecondary)),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              MLDStatusChip(
+                label: 'CAGE • ${_fmtLong(cageRemaining)} LEFT',
+                color: accent,
               ),
               const Spacer(),
+              MLDTimer(
+                remainingSeconds: cageRemaining,
+                ringProgress:
+                    1 - (cageRemaining / AppConstants.cageDurationSeconds),
+                color: AppColors.textPrimary,
+                ringColor: accent,
+                size: 48,
+              ),
+              const SizedBox(height: AppSpacing.lg),
               Text(
-                'Cage ends automatically when the timer reaches zero.',
-                textAlign: TextAlign.center,
-                style: AppTypography.caption(color: AppColors.textDisabled),
+                'Remaining',
+                style: AppTypography.label(),
               ),
               const SizedBox(height: AppSpacing.md),
+              Text(
+                isDetox
+                    ? 'Cage active — repeated violations intensified your restriction.'
+                    : 'Cage active — distractions stay blocked and intensified.',
+                textAlign: TextAlign.center,
+                style: AppTypography.caption(color: AppColors.textSecondary),
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Expanded(
+                    child: MLDStatTile(
+                      label: isDetox ? 'Apps restricted' : 'Blocked apps',
+                      value: '${live?.blockedAppCount ?? 0}',
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: MLDStatTile(label: 'Warnings', value: '${live?.violationCount ?? 0}', accent: AppColors.warning)),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: MLDStatTile(label: 'Coins', value: '${app.state.coins}', accent: AppColors.warning)),
+                ],
+              ),
+              if (_primeActive) ...[
+                const SizedBox(height: AppSpacing.md),
+                const MLDStatusChip(
+                  label: 'PRIME COMMIT — NO UNLOCKS, NO BAILOUTS',
+                  color: AppColors.prime,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.xxl),
+
+              // v2.9.8 r24: the control area mirrors the ACTIVE MOOD's
+              // session screen 1:1 (the r22 per-mood split) — Detox keeps
+              // End / Details / Temporary Unlock; Study is the hard-locked
+              // surface with no controls. Pause deliberately hidden — a
+              // break during the cage would defeat the punishment.
+              if (isDetox) ...[
+                // Detox keeps its original controls: End / Details + temp
+                // unlock (same as the Detox session screen).
+                Row(
+                  children: [
+                    if (live != null) ...[
+                      Expanded(
+                        child: MLDButton(
+                          label: 'End',
+                          icon: Icons.stop_rounded,
+                          variant: MLDButtonVariant.danger,
+                          expanded: false,
+                          height: 48,
+                          onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeBailout),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                    ],
+                    Expanded(
+                      child: MLDButton(
+                        label: 'Details',
+                        icon: Icons.info_outline,
+                        variant: MLDButtonVariant.secondary,
+                        expanded: false,
+                        height: 48,
+                        onPressed: () => _showDetails(cageRemaining),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                // While a Prime commit owns the session the temporary-unlock
+                // path is refused natively anyway; show the one real exit
+                // instead: the TOTP emergency give-up.
+                if (_primeActive)
+                  MLDButton(
+                    label: 'END WITH EMERGENCY CODE',
+                    icon: Icons.military_tech_outlined,
+                    variant: MLDButtonVariant.danger,
+                    loading: _primeBusy,
+                    onPressed: _giveUpPrime,
+                  )
+                else
+                  MLDButton(
+                    label: unlockActive
+                        ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)}'
+                        : 'TEMPORARY UNLOCK · 5 coins = 5 min',
+                    icon: Icons.lock_open,
+                    onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeTempUnlock),
+                  ),
+              ] else ...[
+                // Study Mode deliberately has no End/Pause/Unlock control —
+                // the same hard-lock surface as the Study session screen;
+                // the cage ends automatically when the timer reaches zero.
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.study.withValues(alpha: .14),
+                        AppColors.surface,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    border: Border.all(color: AppColors.study.withValues(alpha: .32)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.study.withValues(alpha: .14),
+                        ),
+                        child: const Icon(Icons.lock_rounded, color: AppColors.study),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('STUDY MODE IS LOCKED', style: AppTypography.label(color: AppColors.study)),
+                            const SizedBox(height: 3),
+                            Text(
+                              'No pause, end or temporary unlock. Stay focused until the timer reaches zero.',
+                              style: AppTypography.caption(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_primeActive) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  MLDButton(
+                    label: 'END WITH EMERGENCY CODE',
+                    icon: Icons.military_tech_outlined,
+                    variant: MLDButtonVariant.danger,
+                    loading: _primeBusy,
+                    onPressed: _giveUpPrime,
+                  ),
+                ],
+              ],
+              const SizedBox(height: AppSpacing.md),
+
+              // Emergency is ALWAYS discoverable (PRD §27, UI/UX §88).
               TextButton.icon(
                 onPressed: () => NativeBridge.instance.openEmergencyDialer(),
                 icon: const Icon(Icons.emergency_outlined, size: 18, color: AppColors.danger),
-                label: const Text('Emergency',
+                label: const Text('Emergency Call',
                     style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)),
               ),
-              const SizedBox(height: AppSpacing.xxl),
             ],
           ),
         ),
       ),
       ),
     );
+  }
+
+  /// Details sheet — the session screen's summary facts, cage edition.
+  Future<void> _showDetails(int cageRemaining) async {
+    final app = AppStateScope.of(context);
+    final s = app.state.session;
+    // Promoted capture (same pattern as build).
+    final SessionSnapshot? live = (s != null && s.isActive) ? s : null;
+    final isDetox = live != null && live.mode == SessionMode.detox;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xxl, AppSpacing.xxl, AppSpacing.xxl, AppSpacing.xxl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Cage Details', style: AppTypography.section()),
+              const SizedBox(height: AppSpacing.xxl),
+              _detailRow('Mode', isDetox ? 'Detox' : 'Study'),
+              _detailRow('Cage time', '${_fmtLong(cageRemaining)} remaining'),
+              if (live != null) ...[
+                _detailRow('Session time', '${_fmtLong(live.remainingSeconds)} of ${_fmtLong(live.totalSeconds)} remaining'),
+                _detailRow('Progress', '${(live.progress * 100).round()}%'),
+                _detailRow('Apps ${isDetox ? 'restricted' : 'blocked'}', '${live.blockedAppCount}'),
+                if (!isDetox) _detailRow('Breaks used', '${live.pauseCount} of ${live.maxPauses}'),
+                _detailRow('Warnings', '${live.violationCount}'),
+              ],
+              _detailRow('Coins', '${app.state.coins}'),
+              const SizedBox(height: AppSpacing.xl),
+              MLDButton(
+                label: 'CLOSE',
+                variant: MLDButtonVariant.secondary,
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: AppTypography.caption())),
+          Text(value, style: AppTypography.body(weight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  /// v2.9.3 r19 — the Prime give-up flow, reachable from this locked
+  /// surface too (see _primeActive). TOTP verified natively; a relapse is
+  /// NOT a celebration, so the completion redirect is suppressed (same
+  /// pattern as the bailout screen).
+  Future<void> _giveUpPrime() async {
+    if (_primeBusy) return;
+    final code = await _askEmergencyCode();
+    if (!mounted || code == null) return;
+    setState(() => _primeBusy = true);
+
+    final app = _app ?? AppStateScope.of(context);
+    _app = app;
+    app.suppressCompletionRedirect = true;
+
+    final error = await NativeBridge.instance.giveUpPrimeCommit(code: code);
+    if (!mounted) {
+      app.suppressCompletionRedirect = false;
+      return;
+    }
+    if (error != null) {
+      app.suppressCompletionRedirect = false;
+      setState(() => _primeBusy = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppConstants.routeShell,
+      (route) => false,
+    );
+  }
+
+  /// TOTP emergency-code dialog (same flow as the Prime screen).
+  Future<String?> _askEmergencyCode() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Emergency code'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+                'Enter the CURRENT 6-digit code from your emergency sheet. '
+                'Each code works once for 5 minutes.\n\nGiving up resets '
+                'your streak to Day 1.'),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                  border: OutlineInputBorder(), counterText: ''),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Use code')),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  String _fmtLong(int s) {
+    final h = s ~/ 3600;
+    final m = (s % 3600) ~/ 60;
+    if (h > 0) return '${h}h ${m}m';
+    return '${m}m';
   }
 }
 
