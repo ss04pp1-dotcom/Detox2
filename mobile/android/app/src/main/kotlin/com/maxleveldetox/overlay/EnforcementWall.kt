@@ -135,6 +135,20 @@ object EnforcementWall {
         show(service, KIND_CAGE, "", "")
     }
 
+    /**
+     * v2.9.9 r25 (user request: cage = active Mood's session screen) —
+     * arm the cage timer WITHOUT showing the wall overlay. The cage is
+     * served IN THE APP: the accessibility service launches MainActivity
+     * and the Flutter cage surface (which mirrors the running mood's
+     * session screen 1:1) takes over the whole in-app experience. The
+     * wall only ever covers OTHER apps — the a11y cage gate reasserts it
+     * the moment the user leaves our app for anything that is not the
+     * dialer.
+     */
+    fun startCage(endElapsed: Long) {
+        cageEndElapsed = endElapsed
+    }
+
     // -----------------------------------------------------------------
     // Internals
     // -----------------------------------------------------------------

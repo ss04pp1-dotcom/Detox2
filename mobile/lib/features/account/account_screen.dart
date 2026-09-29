@@ -30,6 +30,11 @@ class _AccountScreenState extends State<AccountScreen> {
   bool _adminActive = false;
   String? _deviceId;
   String? _displayName;
+  // v2.9.9 r25: the signed-in identity — Gmail, age and class are shown
+  // on the profile card (user report: "account shows no Gmail, no name").
+  String? _email;
+  int? _age;
+  String? _grade;
   int _streakDays = 0;
   int _coinBalance = 0;
   int _focusMinutes = 0;
@@ -69,7 +74,7 @@ class _AccountScreenState extends State<AccountScreen> {
       try {
         final sub = await client.fetchSubscription();
         final trial = await client.fetchTrial();
-        await _loadDisplayName();
+        await _loadAccountInfo();
         if (!mounted) return;
         setState(() {
           _sub = (sub != null && sub['subscription'] is Map)
@@ -92,14 +97,41 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
-  Future<void> _loadDisplayName() async {
+  /// v2.9.9 r25 — full account identity from the server: Gmail (email),
+  /// display name, age and class (the r24 signup profile). /me is the
+  /// authority; the local signup mirror (mld_profile_*) is the offline
+  /// fallback for the fields the server copy has not backfilled yet.
+  Future<void> _loadAccountInfo() async {
+    // Local signup mirror first (instant, offline-safe).
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localAge = prefs.getInt('mld_profile_age');
+      final localClass = prefs.getString('mld_profile_class');
+      final localName = prefs.getString('mld_profile_name');
+      if (mounted) {
+        setState(() {
+          _displayName ??= (localName?.isNotEmpty == true ? localName : null);
+          _age ??= localAge;
+          _grade ??= (localClass?.isNotEmpty == true ? localClass : null);
+        });
+      }
+    } catch (_) {}
+
     if (!ApiClient.instance.isAuthenticated) return;
     try {
       final me = await ApiClient.instance.fetchMe();
-      final name = me?['user'] is Map
-          ? (me!['user'] as Map)['displayName'] as String?
-          : null;
-      if (mounted && name != null) setState(() => _displayName = name);
+      final user = me?['user'] is Map ? (me!['user'] as Map) : null;
+      if (!mounted || user == null) return;
+      setState(() {
+        final name = user['displayName'] as String?;
+        if (name != null && name.isNotEmpty) _displayName = name;
+        final email = user['email'] as String?;
+        if (email != null && email.isNotEmpty) _email = email;
+        final age = user['age'];
+        if (age is int) _age = age;
+        final grade = user['grade'] as String?;
+        if (grade != null && grade.isNotEmpty) _grade = grade;
+      });
     } catch (_) {}
   }
 
@@ -297,7 +329,12 @@ class _AccountScreenState extends State<AccountScreen> {
     final userTitle = _displayName?.isNotEmpty == true
         ? _displayName!
         : (signedIn ? 'Detox Warrior #$shortId' : 'Guest Warrior #$shortId');
-    final userSubtitle = signedIn ? 'Cloud Sync Enabled' : 'Device ID: #$shortId · Tap to Sign In';
+    // v2.9.9 r25: the signed-in Gmail is the identity line (user report:
+    // "no Gmail, no name on the account") — the generic 'Cloud Sync
+    // Enabled' line only shows while the email is still loading.
+    final userSubtitle = signedIn
+        ? (_email ?? 'Cloud Sync Enabled')
+        : 'Device ID: #$shortId · Tap to Sign In';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -512,7 +549,49 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                   ),
                 ),
+                // v2.9.9 r25 — age / class chips under the identity (the
+                // signup profile: Gmail, name, age, class).
+                if (_grade?.isNotEmpty == true || _age != null) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      if (_grade?.isNotEmpty == true)
+                        _profileChip(Icons.school_outlined, _grade!),
+                      if (_age != null)
+                        _profileChip(Icons.cake_outlined, 'Age $_age'),
+                    ],
+                  ),
+                ],
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// v2.9.9 r25 — small age / class chip under the profile identity.
+  Widget _profileChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.elevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.edge),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: AppColors.primary),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
             ),
           ),
         ],

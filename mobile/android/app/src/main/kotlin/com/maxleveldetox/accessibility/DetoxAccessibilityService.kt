@@ -181,6 +181,18 @@ class DetoxAccessibilityService : AccessibilityService() {
                 // Allowed in dialer for emergency
                 return
             }
+            // v2.9.9 r25 (user request: cage = active Mood's session
+            // screen): OUR OWN APP is allowed during the cage — the
+            // Flutter cage surface takes over the whole in-app experience
+            // and mirrors the running mood's session screen (icon, title,
+            // timer, stats, per-mood controls) with the cage countdown.
+            // Kicking the user out of the app here is what made the cage
+            // look like a foreign punishment screen. Only the dialer and
+            // ourselves are reachable; every other app still gets the
+            // wall + HOME below.
+            if (pkg == packageName) {
+                return
+            }
             // v2.9.2 r18 (user-requested): leaving the dialer ENDS the
             // emergency and returns the user straight back to the cage.
             if (EmergencyLockdown.isActive(this)) {
@@ -669,13 +681,44 @@ class DetoxAccessibilityService : AccessibilityService() {
                     // v2.9.4 r20: the cage end is ALWAYS the 60 s burst cage
                     // (the old 30-minute default in LockController.cage was
                     // a zombie-cage source — see SessionEngine.recoverIfNeeded).
-                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    // v2.9.9 r25 (user request: cage = active Mood's session
+                    // screen): the cage is served IN THE APP — bring
+                    // MainActivity forward so the Flutter cage surface
+                    // (mirroring the running mood's session screen with the
+                    // cage countdown) is what the user sees, instead of
+                    // dumping them on the launcher behind a wall. The wall
+                    // still covers every other app if they leave (the cage
+                    // gate reasserts it).
                     val cageEnd = SystemClockNow.elapsed + REELS_CAGE_MS
                     if (EnforcementWall.isBound()) {
-                        EnforcementWall.showCage(this, cageEnd)
+                        EnforcementWall.startCage(cageEnd)
                     } else {
                         LockController.cage(this, cageEnd)
                     }
+                    // v2.9.9 r25: mirror the 60 s burst cage into the
+                    // PERSISTED state — the Flutter cage surface (which
+                    // mirrors the active mood's session screen, per the
+                    // user request) renders from stateRepo.cage, so
+                    // without this the app would never show it. The
+                    // 60 s burst end is used, NOT the 30-min config
+                    // default (that mismatch was the old zombie-cage
+                    // source). Every read treats an expired cage as
+                    // inactive and the periodic monitors call
+                    // releaseCageIfExpired, so this can never outlive
+                    // its minute. Broadcast so the bridge pushes the
+                    // cage state to Flutter immediately.
+                    scope.launch {
+                        try {
+                            app.stateRepo.saveCage(
+                                com.maxleveldetox.enforcement.CageSnapshot(
+                                    true, cageEnd - REELS_CAGE_MS, cageEnd))
+                            com.maxleveldetox.enforcement.SessionEngine
+                                .Broadcaster.emit()
+                        } catch (e: Exception) {
+                            DiagLog.logError("burstCagePersist", e)
+                        }
+                    }
+                    launchCageSurface()
                 } else {
                     try {
                         android.widget.Toast.makeText(
@@ -791,6 +834,29 @@ class DetoxAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         // Service interrupted — persisted state + recovery handle continuity.
+    }
+
+    /**
+     * v2.9.9 r25 — bring our own app forward: the cage is served in-app
+     * on the mood-mirroring Flutter cage surface (user request: cage =
+     * the active mood's session screen, 100% same design). MainActivity
+     * is singleTop, so an existing instance is simply brought to the
+     * front (onNewIntent) — never duplicated, and the Flutter navigator
+     * state (the cage route) is preserved.
+     */
+    private fun launchCageSurface() {
+        try {
+            val intent = android.content.Intent(
+                this, com.maxleveldetox.MainActivity::class.java)
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            DiagLog.log("CAGE_SURFACE", "app brought forward for in-app cage")
+        } catch (e: Exception) {
+            // Never a gap: if the launch fails (background-activity
+            // restrictions on this OEM etc.) the cage timer is armed and
+            // the wall still covers other apps via the cage gate.
+            DiagLog.logError("launchCageSurface", e)
+        }
     }
 
     // -----------------------------------------------------------------

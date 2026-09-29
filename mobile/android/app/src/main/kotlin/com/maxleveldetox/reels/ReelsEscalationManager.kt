@@ -122,6 +122,23 @@ class ReelsEscalationManager(
         }
     }
 
+    /**
+     * v2.9.9 r25 — a fresh session starts a fresh ladder. The burst
+     * counter is PERSISTED, so shorts attempts made BEFORE starting a
+     * Study/Detox session (a near-threshold leftover, e.g. 4 of 5) could
+     * otherwise land the user in the cage on their first in-session
+     * detection — reported as "starting Study Mode throws me straight
+     * into the cage". Session start wipes the consecutive counter; the
+     * daily counters (lockouts, passes, allowance) are untouched.
+     */
+    suspend fun resetBurst() = mutex.withLock {
+        val state = rolloverDateIfNeeded(stateRepo.blockingReels())
+        if (state.consecutiveCount != 0) {
+            stateRepo.saveReels(
+                state.copy(consecutiveCount = 0, lastBlockElapsed = 0L))
+        }
+    }
+
     private suspend fun escalateLocked(pkg: String): Escalation? = mutex.withLock {
         var state = rolloverDateIfNeeded(stateRepo.blockingReels())
 

@@ -147,6 +147,16 @@ class SessionEngine(
         stateRepo.saveSession(snapshot)
         violationManager.clearSessionViolations = snapshot.id
 
+        // v2.9.9 r25 — a fresh session starts a fresh shorts ladder: the
+        // burst counter is persisted, so pre-session attempts (a
+        // near-threshold leftover) must never cage the user inside their
+        // own session start (user report: "starting Study Mode throws me
+        // straight into the cage"). Best-effort — never blocks the start.
+        try {
+            com.maxleveldetox.MldApp.get(context).reelsEscalation.resetBurst()
+        } catch (_: Exception) {
+        }
+
         // Count of blocked apps for UI display.
         SessionSnapshot.cachedBlockedCount = countBlockedApps(snapshot)
 
