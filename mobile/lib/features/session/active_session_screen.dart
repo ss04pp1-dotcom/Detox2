@@ -1069,6 +1069,13 @@ class _CageViewState extends State<_CageView> {
     return result;
   }
 
+  /// m:ss — same format as the session screen's unlock chip.
+  String _fmt(int s) {
+    final m = s ~/ 60;
+    final sec = s % 60;
+    return '$m:${sec.toString().padLeft(2, '0')}';
+  }
+
   String _fmtLong(int s) {
     final h = s ~/ 3600;
     final m = (s % 3600) ~/ 60;
