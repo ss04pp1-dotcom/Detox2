@@ -206,7 +206,7 @@ class NativeLockKioskView(
                         orientation = VERTICAL
                         gravity = Gravity.CENTER
                         setPadding(dp(12), dp(10), dp(12), dp(9))
-                        background = gradient(SURFACE, EDGE, 16)
+                        background = gradient(SURFACE, Color.parseColor(EDGE), 16)
                         setOnClickListener { onLaunchAllowed?.invoke(pkg) }
                     }
                     card.addView(ImageView(service).apply {
@@ -337,7 +337,7 @@ class NativeLockKioskView(
             orientation = VERTICAL
             gravity = Gravity.CENTER
             setPadding(dp(7), dp(9), dp(7), dp(9))
-            background = gradient(SURFACE, EDGE, 16)
+            background = gradient(SURFACE, Color.parseColor(EDGE), 16)
         }
         tile.addView(ImageView(service).apply {
             setImageResource(iconRes)
