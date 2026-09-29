@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme/tokens.dart';
+import '../../data/ad_reward_manager.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
 import '../../data/native_bridge.dart';
@@ -678,10 +680,17 @@ class _CageViewState extends State<_CageView> {
   bool _primeBusy = false;
   AppState? _app;
 
+  // v2.9.11 r27 (user request — the cage screen is FUNCTIONAL): a
+  // rewarded ad can be watched from inside the cage itself to earn
+  // coins toward the 5-coin temporary unlock.
+  bool _adBusy = false;
+
   @override
   void initState() {
     super.initState();
     _checkPrime();
+    // Preload so the WATCH AD button is instantly usable.
+    AdRewardManager.instance.preload();
   }
 
   Future<void> _checkPrime() async {
@@ -701,6 +710,43 @@ class _CageViewState extends State<_CageView> {
   void dispose() {
     _app?.suppressCompletionRedirect = false;
     super.dispose();
+  }
+
+  /// v2.9.11 r27 (user request): End from inside the cage — haptic
+  /// (vibration) press feedback, then the SAME bailout flow as the
+  /// session screen's End button. The native finalize also clears the
+  /// cage, so paying to leave ends BOTH the session and the cage.
+  void _endSession() {
+    HapticFeedback.mediumImpact();
+    Navigator.of(context).pushNamed(AppConstants.routeBailout);
+  }
+
+  /// v2.9.11 r27 (user request): watch a rewarded ad right here and
+  /// earn +1 coin toward the 5-coin temporary unlock — no navigation,
+  /// the ad plays over the cage surface and the COINS tile above
+  /// updates live when the reward lands.
+  Future<void> _watchAd() async {
+    if (_adBusy) return;
+    setState(() => _adBusy = true);
+    final outcome = await AdRewardManager.instance.showAndEarn();
+    if (!mounted) return;
+    setState(() => _adBusy = false);
+    switch (outcome) {
+      case AdOutcome.earned:
+        HapticFeedback.mediumImpact();
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('+1 COIN — keep going.')));
+      case AdOutcome.dismissed:
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ad closed before the reward — no coin.')));
+      case AdOutcome.failedToLoad:
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No ad available right now. Try again in a moment.')));
+      case AdOutcome.failedToShow:
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not play the ad. No coin was charged.')));
+    }
   }
 
   @override
@@ -812,16 +858,15 @@ class _CageViewState extends State<_CageView> {
               ],
               const SizedBox(height: AppSpacing.xxl),
 
-              // v2.9.8 r24: the control area mirrors the ACTIVE MOOD's
-              // session screen 1:1 (the r22 per-mood split) — Detox keeps
-              // End / Details / Temporary Unlock; Study is the hard-locked
-              // surface with no controls. Pause deliberately hidden — a
-              // break during the cage would defeat the punishment.
-              if (isDetox) ...[
-                // Detox keeps its original controls: End / Details + temp
-                // unlock (same as the Detox session screen). NB: isDetox
-                // implies a live session (it tests live != null), so End
-                // always has something to end here.
+              // v2.9.11 r27 (user request — the cage screen is a
+              // FUNCTIONAL copy of the session screen, not a dead end):
+              // BOTH moods now get the same working controls — End
+              // (bailout, haptic press feedback), Details, Temporary
+              // Unlock (5 coins = 5 min, now allowed natively during the
+              // cage) and rewarded-ads coin earning, all from inside the
+              // cage. Pause deliberately stays hidden — a study break
+              // during the cage would defeat the punishment.
+              if (live != null) ...[
                 Row(
                   children: [
                     Expanded(
@@ -831,7 +876,7 @@ class _CageViewState extends State<_CageView> {
                         variant: MLDButtonVariant.danger,
                         expanded: false,
                         height: 48,
-                        onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeBailout),
+                        onPressed: _endSession,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -848,80 +893,46 @@ class _CageViewState extends State<_CageView> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),
-                // While a Prime commit owns the session the temporary-unlock
-                // path is refused natively anyway; show the one real exit
-                // instead: the TOTP emergency give-up.
-                if (_primeActive)
-                  MLDButton(
-                    label: 'END WITH EMERGENCY CODE',
-                    icon: Icons.military_tech_outlined,
-                    variant: MLDButtonVariant.danger,
-                    loading: _primeBusy,
-                    onPressed: _giveUpPrime,
-                  )
-                else
-                  MLDButton(
-                    label: unlockActive
-                        ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)}'
-                        : 'TEMPORARY UNLOCK · 5 coins = 5 min',
-                    icon: Icons.lock_open,
-                    onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeTempUnlock),
-                  ),
               ] else ...[
-                // Study Mode deliberately has no End/Pause/Unlock control —
-                // the same hard-lock surface as the Study session screen;
-                // the cage ends automatically when the timer reaches zero.
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.study.withValues(alpha: .14),
-                        AppColors.surface,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadii.card),
-                    border: Border.all(color: AppColors.study.withValues(alpha: .32)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.study.withValues(alpha: .14),
-                        ),
-                        child: const Icon(Icons.lock_rounded, color: AppColors.study),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('STUDY MODE IS LOCKED', style: AppTypography.label(color: AppColors.study)),
-                            const SizedBox(height: 3),
-                            Text(
-                              'No pause, end or temporary unlock. Stay focused until the timer reaches zero.',
-                              style: AppTypography.caption(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                // The cage outlived its session — Details only (End has
+                // nothing left to end; unlock + ad paths still work).
+                MLDButton(
+                  label: 'Details',
+                  icon: Icons.info_outline,
+                  variant: MLDButtonVariant.secondary,
+                  height: 48,
+                  onPressed: () => _showDetails(cageRemaining),
                 ),
-                if (_primeActive) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  MLDButton(
-                    label: 'END WITH EMERGENCY CODE',
-                    icon: Icons.military_tech_outlined,
-                    variant: MLDButtonVariant.danger,
-                    loading: _primeBusy,
-                    onPressed: _giveUpPrime,
-                  ),
-                ],
+                const SizedBox(height: AppSpacing.md),
+              ],
+              // While a Prime commit owns the session the temporary-unlock
+              // path is refused natively anyway; show the one real exit
+              // instead: the TOTP emergency give-up.
+              if (_primeActive)
+                MLDButton(
+                  label: 'END WITH EMERGENCY CODE',
+                  icon: Icons.military_tech_outlined,
+                  variant: MLDButtonVariant.danger,
+                  loading: _primeBusy,
+                  onPressed: _giveUpPrime,
+                )
+              else ...[
+                MLDButton(
+                  label: unlockActive
+                      ? 'UNLOCK ACTIVE · ${_fmt(tempUnlock!.remainingSeconds)}'
+                      : 'TEMPORARY UNLOCK · ${AppConstants.tempUnlockCost} coins = ${AppConstants.tempUnlockMinutes} min',
+                  icon: Icons.lock_open,
+                  onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeTempUnlock),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                MLDButton(
+                  label: 'WATCH AD · EARN +${AppConstants.coinsPerAd} COIN',
+                  icon: Icons.play_circle_outline,
+                  variant: MLDButtonVariant.secondary,
+                  height: 44,
+                  loading: _adBusy,
+                  onPressed: _watchAd,
+                ),
               ],
               const SizedBox(height: AppSpacing.md),
 

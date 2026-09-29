@@ -16,13 +16,19 @@ import kotlinx.coroutines.sync.withLock
  * NATIVE VALIDATION (TRD §41): Flutter's requestTempUnlock(packages) is a
  * REQUEST. Before anything happens we verify, in order:
  *   1. a session is actually active
- *   2. no cage is running (cage disables unlocks, PRD §17)
+ *   2. no Prime commit owns the session (one exit only)
  *   3. no unlock is already running (one at a time)
  *   4. the requested packages are unlockable by policy
  *   5. the coin balance covers the configured cost
  * Only then is the coin spend executed atomically and the unlock window
  * persisted. Expiry is lazy: every policy evaluation checks the window and
  * clears it the moment it ends — enforcement resumes IMMEDIATELY.
+ *
+ * v2.9.11 r27 (user request — the cage screen is FUNCTIONAL, not a dead
+ * end): the old CAGE_ACTIVE refusal is GONE. A temporary unlock can now
+ * be bought from inside the cage; the a11y cage gate allows the window's
+ * packages through (see DetoxAccessibilityService.handleForeground) and
+ * full cage enforcement resumes the moment the window expires.
  */
 class TempUnlockManager(
     private val stateRepo: StateRepository,
@@ -45,12 +51,6 @@ class TempUnlockManager(
         if (prime.active && prime.sessionId == session.id) {
             return Result(false, ErrorCodes.PRIME_ACTIVE,
                 "Temporary unlock is disabled during a Prime commit.")
-        }
-
-        val cage = stateRepo.blockingCage()
-        if (cage.active && !cage.isExpired(SystemClockNow.elapsed)) {
-            return Result(false, ErrorCodes.CAGE_ACTIVE,
-                "Temporary unlock is disabled while Cage is active.")
         }
 
         val current = stateRepo.blockingTempUnlock()

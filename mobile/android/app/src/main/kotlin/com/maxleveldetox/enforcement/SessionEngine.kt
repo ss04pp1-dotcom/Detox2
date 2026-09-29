@@ -164,6 +164,15 @@ class SessionEngine(
         scheduleEndAlarm(snapshot.endElapsed)
         createNotificationChannelsOnce()
 
+        // v2.9.11 r27: arm the a11y key filter THIS INSTANT — it is kept
+        // disarmed at idle (the volume multi-press root fix) and the
+        // nav-key lockdown must be live from the first second of the
+        // session, not on the next 2 s watchdog tick.
+        try {
+            com.maxleveldetox.accessibility.DetoxAccessibilityService.syncKeyFilterSoon()
+        } catch (_: Exception) {
+        }
+
         Broadcaster.emit()
         // v2.5.5 audit fix m-4: the identical-branch conditional was a
         // copy-paste smell — emit mode-specific event names.
@@ -478,12 +487,28 @@ class SessionEngine(
         stateRepo.saveSession(null)
         stateRepo.saveCage(CageSnapshot.INACTIVE)
         tempUnlockManager.clear()
+        // v2.9.11 r27: the cage screen is functional and offers the same
+        // End (bailout) as the session screen — ending the session must
+        // also end the IN-MEMORY cage, or the a11y cage gate would keep
+        // blocking every app for the rest of the burst window after the
+        // user already paid to leave.
+        try {
+            com.maxleveldetox.overlay.EnforcementWall.clearCage()
+        } catch (_: Exception) {
+        }
 
         cancelAlarm(EnforcementReceiver.ACTION_SESSION_END)
         cancelAlarm(EnforcementReceiver.ACTION_CAGE_END)
         EnforcementService.stop(context)
         // v2.9 r17: disarm the session kiosk surfaces when the session ends.
         com.maxleveldetox.enforcement.KioskController.syncAsync(stateRepo)
+        // v2.9.11 r27: disarm the a11y key filter right away — at idle the
+        // input pipeline must never round-trip key events through us
+        // (volume multi-press root fix; the watchdog loop backstops this).
+        try {
+            com.maxleveldetox.accessibility.DetoxAccessibilityService.syncKeyFilterSoon()
+        } catch (_: Exception) {
+        }
 
         // History row.
         val completed = finalStatus == SessionStatus.COMPLETED

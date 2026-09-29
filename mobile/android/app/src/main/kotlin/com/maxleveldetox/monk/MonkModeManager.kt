@@ -83,6 +83,13 @@ object MonkModeManager {
 
         MonkModeLockService.start(context, freshActivation = true)
 
+        // v2.9.11 r27: monk mode enforces the nav-key lockdown — arm the
+        // a11y key filter instantly (watchdog backstop).
+        try {
+            com.maxleveldetox.accessibility.DetoxAccessibilityService.syncKeyFilterSoon()
+        } catch (_: Exception) {
+        }
+
         // v2.1 Phase C: first monk activation bonus.
         try {
             (context.applicationContext as? com.maxleveldetox.MldApp)
@@ -100,6 +107,12 @@ object MonkModeManager {
             json.put("endReason", reason)
             json.put("endWallMs", System.currentTimeMillis())
             prefs.edit().putString(K_SESSION, json.toString()).apply()
+        }
+        // v2.9.11 r27: disarm the a11y key filter when monk mode ends
+        // (volume multi-press root fix — no key round-trip at idle).
+        try {
+            com.maxleveldetox.accessibility.DetoxAccessibilityService.syncKeyFilterSoon()
+        } catch (_: Exception) {
         }
         context.startService(
             Intent(context, MonkModeLockService::class.java)

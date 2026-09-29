@@ -147,6 +147,27 @@ object EnforcementWall {
      */
     fun startCage(endElapsed: Long) {
         cageEndElapsed = endElapsed
+        // v2.9.11 r27: the cage enforces too (nav-key lockdown) — arm
+        // the a11y key filter the instant the cage starts; the 2 s
+        // watchdog loop backstops the disarm at cage end.
+        try {
+            com.maxleveldetox.accessibility.DetoxAccessibilityService.syncKeyFilterSoon()
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * v2.9.11 r27 — end the cage IMMEDIATELY (session bailout / any
+     * finalize). The r27 cage screen is functional and offers the same
+     * End (bailout) control as the session screen; when the user pays
+     * to end the session there must be no zombie in-memory cage left
+     * blocking apps for the rest of the burst window.
+     */
+    fun clearCage() {
+        cageEndElapsed = 0L
+        if (overlayKind == KIND_CAGE) {
+            hide()
+        }
     }
 
     // -----------------------------------------------------------------

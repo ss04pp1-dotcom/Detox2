@@ -414,6 +414,13 @@ object LockMyPhoneController {
             put("ended", false)
         }
         prefs.edit().putString(K_SESSION, json.toString()).apply()
+        // v2.9.11 r27: lock-my-phone enforces the nav-key lockdown — arm
+        // the a11y key filter instantly (watchdog loop backstops the
+        // disarm at session end).
+        try {
+            com.maxleveldetox.accessibility.DetoxAccessibilityService.syncKeyFilterSoon()
+        } catch (_: Exception) {
+        }
         // v2.5 r9.2: make sure the persisted watchdog exists for this
         // session (it may have self-disabled after clean days).
         try {

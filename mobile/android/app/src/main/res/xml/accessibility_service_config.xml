@@ -5,10 +5,13 @@
   Deliberately narrow:
    - Only window-state + window-content events (we do not need view clicks
      or scrolls for enforcement).
-   - canRequestFilterKeyEvents (v2.5 r9.1) is REQUIRED for the service's
-     onKeyEvent() to be called at all: FLAG_REQUEST_FILTER_KEY_EVENTS set
-     from code is silently dropped by the system without this capability,
-     which left the r9 BACK-key consumption while the wall is up dead.
+   - canRequestFilterKeyEvents (v2.5 r9.1) is REQUIRED so the service can
+     set FLAG_REQUEST_FILTER_KEY_EVENTS at runtime — v2.9.11 r27: the flag
+     itself is applied DYNAMICALLY (syncKeyFilterFlag in the service),
+     armed ONLY while a mode is enforcing and DISARMED at idle. Keeping it
+     always-on made the input dispatcher round-trip EVERY hardware key
+     through this service even at idle, and OEM pipelines duplicate
+     delayed volume events — one press moved the volume several steps.
    - canRetrieveWindowContent is required for Shorts detection; node text is
      processed IN MEMORY and never persisted or uploaded (TRD §115).
    - notificationTimeout throttles event delivery at the system level.
@@ -16,7 +19,7 @@
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagRequestFilterKeyEvents"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
     android:canRequestFilterKeyEvents="true"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_description"

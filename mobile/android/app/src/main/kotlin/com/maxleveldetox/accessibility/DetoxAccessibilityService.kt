@@ -55,17 +55,27 @@ class DetoxAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         DiagLog.log("A11Y_CONNECTED", "service online, events wired")
+        instance = this
         serviceInfo = serviceInfo?.apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
                 AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             notificationTimeout = EVENT_TIMEOUT_MS
-            flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
-                // v2.5 r9: key filtering — lets us consume BACK (and
-                // APP_SWITCH) while the enforcement wall is up (Social
-                // Sentry mechanism #23).
-                AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+            // v2.5 r9 + v2.9.11 r27: FLAG_REQUEST_FILTER_KEY_EVENTS is now
+            // applied DYNAMICALLY by syncKeyFilterFlag() — armed ONLY while
+            // a mode is enforcing. Keeping it always-on made the system
+            // round-trip EVERY hardware key on the device through this
+            // service even at idle, and OEM input pipelines duplicate or
+            // replay delayed volume events — one press moved the volume
+            // several steps (the recurring "ekbar chap dile koyekta chap"
+            // bug). With the flag off at idle, idle volume keys never
+            // touch this service at all.
+            flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         }
+        // Arm or disarm the key filter to match the CURRENT enforcement
+        // state (a session may already be running when the service
+        // (re)connects — recovery path).
+        syncKeyFilterFlag()
 
         // v2.5 r9: bind the primary blocking surface (TYPE_ACCESSIBILITY_
         // OVERLAY wall — floats above the status/nav bars, so home
@@ -192,6 +202,19 @@ class DetoxAccessibilityService : AccessibilityService() {
             // wall + HOME below.
             if (pkg == packageName) {
                 return
+            }
+            // v2.9.11 r27 (user request: the cage screen is FUNCTIONAL —
+            // a paid temporary-unlock window bought INSIDE the cage must
+            // actually open its apps): allow the unlock window's packages
+            // through the cage gate. Mirrors PolicyEngine's TEMP_ALLOW
+            // rule outside the cage; the unlock expires on its own and
+            // full cage enforcement resumes automatically.
+            try {
+                val unlock = app.stateRepo.blockingTempUnlock()
+                if (unlock.allows(pkg, SystemClockNow.elapsed)) {
+                    return
+                }
+            } catch (_: Exception) {
             }
             // v2.9.2 r18 (user-requested): leaving the dialer ENDS the
             // emergency and returns the user straight back to the cage.
@@ -878,6 +901,13 @@ class DetoxAccessibilityService : AccessibilityService() {
                 kotlinx.coroutines.delay(KIOSK_ASSERT_INTERVAL_MS)
                 try {
                     val app = application as? MldApp ?: continue
+                    // v2.9.11 r27 — KEY FILTER WATCHDOG: every tick, arm or
+                    // disarm FLAG_REQUEST_FILTER_KEY_EVENTS to match the
+                    // live enforcement state (instant arming is additionally
+                    // triggered at session/cage/monk/lock start; this loop
+                    // is the backstop that DISARMS it within 2 s of the last
+                    // mode ending — the volume multi-press fix).
+                    syncKeyFilterFlag()
                     val session = app.stateRepo.blockingSession()
                     val enforcing = session != null && session.status.isEnforcing
                     if (!enforcing) continue
@@ -911,25 +941,31 @@ class DetoxAccessibilityService : AccessibilityService() {
     }
 
     // -----------------------------------------------------------------
-    // v2.9.6 r22 — KEY FILTER LATENCY FIX (the volume bug).
+    // v2.9.6 r22 — KEY FILTER LATENCY FIX + v2.9.11 r27 — ROOT FIX.
     //
-    // User report: with the app installed, ONE volume press moved the
-    // volume several steps. Root cause: this filter runs for EVERY
-    // hardware key event on the device (flagRequestFilterKeyEvents), and
-    // the old body called isAnyModeActive() unconditionally — which does
-    // a runBlocking DataStore read on the service main thread. That
-    // stalled the system input pipeline (a11y filtering is synchronous
-    // in the dispatch path), and OEM input pipelines replay/stack
-    // delayed key events — so one press landed as several.
+    // User report (three rounds): with the app installed, ONE volume
+    // press moved the volume several steps ("ekbar chap dile onekbar
+    // chap hoye sondho barche"). Two layers were already in place:
+    //   1. FAST PATH — we only ever CONSUME the five navigation keys;
+    //      everything else returns false with ZERO work.
+    //   2. TTL CACHE — the nav-key enforcement check runs at most once
+    //      per 250 ms instead of per event.
+    // The bug STILL came back on the user's OEM, which proves the root
+    // cause was never our handler body: with flagRequestFilterKeyEvents
+    // ALWAYS on, the system input dispatcher performs a synchronous
+    // binder round-trip into this service for EVERY hardware key on the
+    // device — even at complete idle — and that round-trip alone is
+    // enough for OEM pipelines (MIUI/HyperOS, Transsion) to duplicate or
+    // replay volume events.
     //
-    // Fix, two layers:
-    //   1. FAST PATH — we only ever CONSUME the five navigation keys.
-    //      Everything else (volume keys first of all) returns false with
-    //      ZERO work, adding no latency to the device input pipeline.
-    //   2. TTL CACHE — for the nav keys, the enforcement check (and its
-    //      DataStore read) runs at most once per 250 ms instead of per
-    //      event; after a session ends the keys unblock within a
-    //      quarter second worst case.
+    // r27 ROOT FIX: the flag itself is now DYNAMIC — armed ONLY while a
+    // mode is enforcing (syncKeyFilterFlag). At idle, volume keys (and
+    // every other key) never enter this service at all, so one press is
+    // one step, guaranteed. While a mode is enforcing, the fast path +
+    // TTL cache keep the round-trip as short as it can possibly be, and
+    // the small volume-key debounce below additionally consumes
+    // OEM-replayed duplicate presses inside its window (one press = one
+    // step, nothing else — no behaviour is attached to volume keys).
     // -----------------------------------------------------------------
 
     /** Cached isAnyModeActive() verdict — see the comment above. */
@@ -945,12 +981,79 @@ class DetoxAccessibilityService : AccessibilityService() {
         return live
     }
 
+    // -----------------------------------------------------------------
+    // v2.9.11 r27 — DYNAMIC KEY FILTER (the root volume fix).
+    // -----------------------------------------------------------------
+
+    /** Live service reference for instant arm/disarm from other
+     * components (session/cage/monk/lock start). */
+    @Volatile private var keyFilterFlagOn = false
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    @Synchronized
+    fun syncKeyFilterFlag() {
+        val want = isAnyModeActive()
+        if (want == keyFilterFlagOn) return
+        keyFilterFlagOn = want
+        mainHandler.post {
+            try {
+                serviceInfo = serviceInfo?.apply {
+                    flags = if (want) {
+                        flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+                    } else {
+                        flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
+                    }
+                }
+                DiagLog.log("KEY_FILTER", if (want) "armed (enforcement active)" else "disarmed (idle)")
+            } catch (e: Exception) {
+                DiagLog.logError("syncKeyFilterFlag", e)
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // v2.9.11 r27 — VOLUME-KEY DUPLICATE DEBOUNCE (pure bug fix).
+    //
+    // The user's recurring report: ONE volume press registers as MANY
+    // ("ekbar chap dile onekbar chap hoye sondho barche"). The dynamic
+    // key-filter flag above kills the root cause at idle; while a mode
+    // is enforcing the filter is armed and some OEM input pipelines can
+    // still REPLAY a single press as several ACTION_DOWNs. The first
+    // press passes through untouched and replays inside the debounce
+    // window are consumed, so one press is always exactly one step.
+    //
+    // There is NO other behaviour attached to volume keys — no coins,
+    // no toasts, no UI. Physical hold-to-ramp (repeatCount > 0) works
+    // completely normal.
+    // -----------------------------------------------------------------
+
+    /** Last seen volume-key ACTION_DOWN (duplicate/replay protection). */
+    @Volatile private var lastVolumeKeyDownAt = 0L
+
+    private fun onVolumeKeyDebounce(event: KeyEvent): Boolean {
+        // Only fresh presses are debounced; ACTION_UP and hold-repeats
+        // (repeatCount > 0) always pass straight through.
+        if (event.action != KeyEvent.ACTION_DOWN) return false
+        if (event.repeatCount > 0) return false
+        val now = SystemClockNow.elapsed
+        if (now - lastVolumeKeyDownAt < VOLUME_KEY_DEBOUNCE_MS) {
+            DiagLog.log("VOLUME_DEBOUNCE", "replayed volume press consumed")
+            return true
+        }
+        lastVolumeKeyDownAt = now
+        return false
+    }
+
     override fun onKeyEvent(event: KeyEvent?): Boolean {
         event ?: return false
-        // FAST PATH FIRST: keys we never consume pass straight through —
-        // volume keys, camera, power, headset, everything. No state
-        // reads, no work, no added latency.
         return when (event.keyCode) {
+            // v2.9.11 r27 — volume keys have NO app behaviour; this is
+            // only the duplicate-replay debounce of the multi-press bug
+            // fix. Reached only while the key filter is armed (a mode is
+            // enforcing).
+            KeyEvent.KEYCODE_VOLUME_UP,
+            KeyEvent.KEYCODE_VOLUME_DOWN,
+            -> onVolumeKeyDebounce(event)
             KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_APP_SWITCH,
             KeyEvent.KEYCODE_HOME,
@@ -1008,6 +1111,7 @@ class DetoxAccessibilityService : AccessibilityService() {
         com.maxleveldetox.overlay.SessionKiosk.unbind()
         com.maxleveldetox.overlay.SafetyPauseOverlay.unbind()
         A11yOverlayController.hide(this)
+        instance = null
         scope.cancel()
         super.onDestroy()
     }
@@ -1041,6 +1145,25 @@ class DetoxAccessibilityService : AccessibilityService() {
          *  stalled the input pipeline (volume keys stepped several bars
          *  per press). At most one real check per 250 ms. */
         private const val MODE_CACHE_TTL_MS = 250L
+
+        /** v2.9.11 r27 — volume-key duplicate debounce: a REPLAYED
+         *  ACTION_DOWN inside this window is consumed so one press is
+         *  always one step (pure bug fix — no behaviour, no coins). */
+        private const val VOLUME_KEY_DEBOUNCE_MS = 200L
+
+        /** v2.9.11 r27 — live service reference so session/cage/monk/lock
+         *  start can arm the (now dynamic) key filter INSTANTLY; the 2 s
+         *  watchdog loop is the disarm backstop. */
+        @Volatile
+        private var instance: DetoxAccessibilityService? = null
+
+        /** Arm/disarm the a11y key filter to match the live enforcement
+         *  state RIGHT NOW (v2.9.11 r27 volume multi-press root fix).
+         *  Called at mode starts/ends; the kiosk watchdog loop backstops
+         *  it every 2 s in both directions. */
+        fun syncKeyFilterSoon() {
+            instance?.syncKeyFilterFlag()
+        }
 
         /** v2.9 r16 (extended in r18): delayed re-scan schedule after
          *  entering a monitored app — covers late-inflating shorts UI and
