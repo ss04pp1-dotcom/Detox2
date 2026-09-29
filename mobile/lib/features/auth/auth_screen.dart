@@ -556,7 +556,7 @@ class _AuthScreenState extends State<AuthScreen> {
       borderSide: BorderSide(color: AppColors.edge.withValues(alpha: 0.5)),
     );
     return DropdownButtonFormField<String>(
-      value: _selectedClass,
+      initialValue: _selectedClass,
       items: [
         for (final c in _classOptions)
           DropdownMenuItem(
