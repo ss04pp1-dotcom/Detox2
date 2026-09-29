@@ -8,6 +8,7 @@ import '../features/community/community_screen.dart';
 import '../features/emergency_codes/emergency_codes_screen.dart';
 import '../features/lock/lock_my_phone_screen.dart';
 import '../features/monk/monk_mode_screen.dart';
+import '../features/mood/mood_board_screen.dart';
 import '../features/prime/prime_commit_screen.dart';
 import '../features/safety/safety_pause_screen.dart';
 import '../features/tasks/tasks_screen.dart';
@@ -50,6 +51,7 @@ Map<String, WidgetBuilder> buildAppRoutes() {
     AppConstants.routePermissions: (_) => const PermissionSetupScreen(),
     AppConstants.routeShell: (_) => const DashboardScreen(),
     AppConstants.routeStudySetup: (_) => const StudySetupScreen(),
+    AppConstants.routeMoodBoard: (_) => const MoodBoardScreen(),
     AppConstants.routeDetoxSetup: (_) => const DetoxSetupScreen(),
     AppConstants.routeDetoxConfirm: (_) => const DetoxConfirmScreen(),
     AppConstants.routeActivation: (_) => const ActivationScreen(),

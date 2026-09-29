@@ -466,11 +466,21 @@ class _TodayFocus extends StatelessWidget {
             style: AppTypography.body(color: AppColors.textSecondary),
           ),
           const SizedBox(height: AppSpacing.xxl),
+          // v2.9.7 r23 — the Mood Board is the flagship entry point; the two
+          // one-tap shortcuts stay for muscle memory.
+          MLDButton(
+            label: 'PICK A MOOD',
+            icon: Icons.auto_awesome_outlined,
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppConstants.routeMoodBoard),
+          ),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
                 child: MLDButton(
                   label: 'START STUDY',
+                  variant: MLDButtonVariant.secondary,
                   icon: Icons.menu_book_outlined,
                   onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeStudySetup),
                 ),
