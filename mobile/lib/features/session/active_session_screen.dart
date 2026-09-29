@@ -819,22 +819,22 @@ class _CageViewState extends State<_CageView> {
               // break during the cage would defeat the punishment.
               if (isDetox) ...[
                 // Detox keeps its original controls: End / Details + temp
-                // unlock (same as the Detox session screen).
+                // unlock (same as the Detox session screen). NB: isDetox
+                // implies a live session (it tests live != null), so End
+                // always has something to end here.
                 Row(
                   children: [
-                    if (live != null) ...[
-                      Expanded(
-                        child: MLDButton(
-                          label: 'End',
-                          icon: Icons.stop_rounded,
-                          variant: MLDButtonVariant.danger,
-                          expanded: false,
-                          height: 48,
-                          onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeBailout),
-                        ),
+                    Expanded(
+                      child: MLDButton(
+                        label: 'End',
+                        icon: Icons.stop_rounded,
+                        variant: MLDButtonVariant.danger,
+                        expanded: false,
+                        height: 48,
+                        onPressed: () => Navigator.of(context).pushNamed(AppConstants.routeBailout),
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                    ],
+                    ),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: MLDButton(
                         label: 'Details',
