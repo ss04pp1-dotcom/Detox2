@@ -224,6 +224,24 @@ object EnforcementWall {
                 totalDurationSeconds = 60,
                 endElapsed = cageEndElapsed,
                 isCage = true,
+                // v2.9.12 r28 (user request: the cage screen must be
+                // FUNCTIONAL, not a dead end): one tap clears this wall
+                // and brings MainActivity forward, landing the user on
+                // the Flutter cage surface where End (bailout), Details,
+                // Temporary Unlock and WATCH AD all live. Blocking is
+                // unchanged — the a11y cage gate re-asserts this wall the
+                // moment the user leaves our app for anything else.
+                onOpenApp = {
+                    hide()
+                    try {
+                        val intent = Intent(
+                            service, com.maxleveldetox.MainActivity::class.java)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        service.startActivity(intent)
+                    } catch (e: Exception) {
+                        DiagLog.logError("cageOpenControls", e)
+                    }
+                },
             )
             nativeCageView = cageKiosk
             cageKiosk
@@ -473,6 +491,22 @@ object EnforcementWall {
     /** Hide from any thread (posts to main). */
     fun hide() {
         handler.post { hideInternal() }
+    }
+
+    /**
+     * v2.9.12 r28 (user report: "case e eishob kisui hoy nai, ager motoi
+     * ase"): hide the wall ONLY when it is the cage wall. The native cage
+     * wall is a TYPE_ACCESSIBILITY_OVERLAY — it floats ABOVE MainActivity,
+     * and the a11y cage gate's own-package branch used to early-return
+     * without ever removing it, so after a single re-assert the wall sat
+     * on top of the functional Flutter cage surface for the rest of the
+     * lockout. Called whenever OUR OWN app is foreground while the cage
+     * runs — the Flutter cage (End / Details / Temporary Unlock / Watch
+     * Ad) is the in-app UX; the wall only covers OTHER apps.
+     */
+    fun hideIfCage() {
+        if (overlayKind != KIND_CAGE) return
+        hide()
     }
 
     /** True if the live wall is for [pkg] (stale-check on foreground change). */

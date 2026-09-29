@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/constants.dart';
 import 'core/router.dart';
 import 'core/theme/mld_theme.dart';
+import 'data/ad_reward_manager.dart';
 import 'data/api_client.dart';
 import 'data/app_state.dart';
 import 'data/models.dart';
@@ -49,6 +50,17 @@ Future<void> _initAds() async {
   } catch (_) {
     // Ads unavailable on this device/SDK state — the coin faucet simply
     // reports failedToLoad until a later attempt. Never fatal.
+    return;
+  }
+  // v2.9.12 r28 (user report: "ads dekha screen eita to kaj i kore na"):
+  // start the FIRST rewarded preload the moment the SDK is ready instead
+  // of waiting for the user to reach a WATCH AD button — by the time they
+  // do (Coins screen or the r27 functional cage), the ad is usually
+  // already cached.
+  try {
+    await AdRewardManager.instance.preload();
+  } catch (_) {
+    // Preload failures are retried inside preload(); never fatal here.
   }
 }
 

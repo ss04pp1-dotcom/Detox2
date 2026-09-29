@@ -267,6 +267,32 @@ class NativeLockKioskView(
             content.addView(ad, LayoutParams(LayoutParams.MATCH_PARENT, dp(46)).apply { bottomMargin = dp(10) })
         }
 
+        // v2.9.12 r28 (user report: the cage wall was a dead end —
+        // "eishob kisui hoy nai, ager motoi ase"): when an open-app
+        // callback is wired, surface it as a prominent action. On the
+        // cage wall this is the bridge to the FUNCTIONAL Flutter cage
+        // (End / Details / Temporary Unlock / WATCH AD); on the session
+        // wall it returns to the session screen. The wall itself keeps
+        // enforcing until then — the a11y gate re-asserts it the moment
+        // the user leaves our app again.
+        if (onOpenApp != null) {
+            val open = Button(service).apply {
+                text = if (isCage) "OPEN CONTROLS" else "OPEN APP"
+                textSize = 12f
+                isAllCaps = false
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor(TEXT))
+                background = gradient("#0B2A45", accent, 16)
+                setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_lock_open, 0, 0, 0)
+                compoundDrawablePadding = dp(8)
+                setPadding(dp(18), 0, dp(18), 0)
+                setOnClickListener { onOpenApp.invoke() }
+            }
+            content.addView(open, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)).apply {
+                bottomMargin = dp(10)
+            })
+        }
+
         content.addView(TextView(service).apply {
             text = "Your emergency call remains available."
             textSize = 10f

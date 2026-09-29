@@ -28,42 +28,73 @@ class AdRewardManager {
 
   bool get isReady => _loaded != null;
 
-  /// Preload a rewarded ad (called opportunistically on Coins screen).
-  /// v2.5.5 audit fix: wrapped in try/catch — a throwing `RewardedAd.load`
-  /// (e.g. racing the unawaited MobileAds.initialize) used to leave
-  /// `_loading` stuck true forever, permanently bricking the coin faucet
-  /// until process restart, plus an unhandled async error at every
-  /// fire-and-forget call site.
-  Future<void> preload() async {
-    if (_loaded != null || _loading) return;
-    _loading = true;
+  /// v2.9.12 r28 (user report: "ads dekha screen eita to kaj i kore na"):
+  /// single load attempt frequently fails — the FIRST load after startup
+  /// races MobileAds.initialize and a transient no-fill used to leave the
+  /// faucet dead until the next screen visit. Retried here (bounded) with
+  /// the v2.5.5 stuck-`_loading` guard preserved.
+  static const int _loadAttempts = 3;
+  static const Duration _loadRetryDelay = Duration(milliseconds: 1200);
+
+  /// One load attempt; resolves true when an ad is cached.
+  Future<bool> _loadOnce() {
+    final completer = Completer<bool>();
     try {
-      await RewardedAd.load(
+      RewardedAd.load(
         adUnitId: AppConstants.rewardedAdUnitId,
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) {
             _loaded = ad;
-            _loading = false;
+            if (!completer.isCompleted) completer.complete(true);
           },
           onAdFailedToLoad: (error) {
             _loaded = null;
-            _loading = false;
+            if (!completer.isCompleted) completer.complete(false);
           },
         ),
       );
     } catch (_) {
       _loaded = null;
-      _loading = false; // never leave the guard stuck
+      if (!completer.isCompleted) completer.complete(false);
+    }
+    return completer.future;
+  }
+
+  /// Preload a rewarded ad (called at startup, on the Coins screen and on
+  /// the cage surface). Bounded retry — never leaves `_loading` stuck.
+  Future<void> preload() async {
+    if (_loaded != null || _loading) return;
+    _loading = true;
+    try {
+      for (var attempt = 0; attempt < _loadAttempts; attempt++) {
+        if (await _loadOnce()) return;
+        if (attempt < _loadAttempts - 1) {
+          await Future<void>.delayed(_loadRetryDelay);
+        }
+      }
+    } finally {
+      _loading = false;
     }
   }
 
   /// Show the ad and return the outcome. On `earned`, exactly one coin is
   /// awarded natively with an idempotent key.
   Future<AdOutcome> showAndEarn() async {
+    // v2.9.12 r28 (user report: "ads dekha screen kaj kore na"): a tap
+    // that arrived while the preload was still in flight used to fail
+    // INSTANTLY with failedToLoad — the single most common "ad doesn't
+    // work" report. Give the in-flight load a bounded window to land
+    // (the button meanwhile shows its loading state) before giving up.
+    if (_loaded == null) {
+      unawaited(preload());
+      final deadline = DateTime.now().add(const Duration(seconds: 8));
+      while (_loaded == null && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
+    }
     final ad = _loaded;
     if (ad == null) {
-      unawaited(preload());
       return AdOutcome.failedToLoad;
     }
     _loaded = null; // consumed; preload the next in the background

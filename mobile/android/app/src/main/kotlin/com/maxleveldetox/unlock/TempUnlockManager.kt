@@ -41,16 +41,31 @@ class TempUnlockManager(
 
     suspend fun request(packages: List<String>): Result = mutex.withLock {
         val session = stateRepo.blockingSession()
-        if (session == null || !session.status.isEnforcing) {
+        val sessionLive = session != null && session.status.isEnforcing
+        // v2.9.12 r28 (user report — "case er moddhe thekei… temporary
+        // unlock er kajgulo korte parbe"): the burst cage can trigger
+        // OUTSIDE any session (5 rapid shorts attempts with no session
+        // running). Refusing with SESSION_NOT_ACTIVE there left the
+        // cage's TEMPORARY UNLOCK button permanently dead — exactly what
+        // the user reported. The unlock is now buyable whenever EITHER a
+        // session enforces OR the cage is active.
+        val cageLive = try {
+            com.maxleveldetox.overlay.EnforcementWall.isCageActive()
+        } catch (_: Exception) {
+            false
+        }
+        if (!sessionLive && !cageLive) {
             return Result(false, ErrorCodes.SESSION_NOT_ACTIVE, "No active session.")
         }
 
         // Prime commits refuse temporary unlocks (v2.0 Phase B5): the
         // commitment contract has exactly one exit — the TOTP give-up.
-        val prime = stateRepo.blockingPrime()
-        if (prime.active && prime.sessionId == session.id) {
-            return Result(false, ErrorCodes.PRIME_ACTIVE,
-                "Temporary unlock is disabled during a Prime commit.")
+        if (sessionLive) {
+            val prime = stateRepo.blockingPrime()
+            if (prime.active && prime.sessionId == session!!.id) {
+                return Result(false, ErrorCodes.PRIME_ACTIVE,
+                    "Temporary unlock is disabled during a Prime commit.")
+            }
         }
 
         val current = stateRepo.blockingTempUnlock()
@@ -69,7 +84,7 @@ class TempUnlockManager(
         val spend = coinLedger.spend(
             type = "TEMP_UNLOCK_SPEND",
             cost = config.tempUnlockCoins,
-            reference = "unlock:${session.id}:${SystemClockNow.elapsed}",
+            reference = "unlock:${session?.id ?: "cage"}:${SystemClockNow.elapsed}",
         )
         if (!spend.first) {
             return Result(false, ErrorCodes.INSUFFICIENT_COINS,

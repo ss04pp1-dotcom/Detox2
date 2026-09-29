@@ -128,6 +128,15 @@ class DetoxAccessibilityService : AccessibilityService() {
                     com.maxleveldetox.overlay.SessionKiosk.onOwnAppResumed(this)
                 } catch (_: Exception) {
                 }
+                // v2.9.12 r28: same moment, cage edition — our app's window
+                // came forward, so the cage wall must not sit on top of
+                // the functional Flutter cage surface.
+                try {
+                    if (EnforcementWall.isCageActive()) {
+                        EnforcementWall.hideIfCage()
+                    }
+                } catch (_: Exception) {
+                }
             }
             return
         }
@@ -201,6 +210,18 @@ class DetoxAccessibilityService : AccessibilityService() {
             // ourselves are reachable; every other app still gets the
             // wall + HOME below.
             if (pkg == packageName) {
+                // v2.9.12 r28 (user report: "case e eishob kisui hoy nai"):
+                // the FUNCTIONAL cage surface is IN THE APP (End / Details /
+                // Temporary Unlock / Watch Ad, r27). The native cage wall
+                // is a TYPE_ACCESSIBILITY_OVERLAY that floats ABOVE
+                // MainActivity — if it was re-asserted while the user was
+                // away it would keep covering our own cage screen forever.
+                // Clear it the moment our app owns the foreground; the
+                // cage gate re-asserts it on any exit attempt.
+                try {
+                    EnforcementWall.hideIfCage()
+                } catch (_: Exception) {
+                }
                 return
             }
             // v2.9.11 r27 (user request: the cage screen is FUNCTIONAL —
